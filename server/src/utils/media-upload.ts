@@ -3,7 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {env} from '../config/env.js';
-const dir=path.resolve(env.UPLOAD_DIR,'public');
+const dir=path.resolve(env.UPLOAD_DIR || './server/uploads','public');
 fs.mkdirSync(dir,{recursive:true});
 const allowed=new Set(['image/jpeg','image/png','image/webp']);
 const extensions:Record<string,string>={'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp'};
@@ -14,3 +14,4 @@ export const mediaUpload=multer({
   fileFilter:(_req,file,cb)=>{try{validateName(file.originalname);if(!allowed.has(file.mimetype))return cb(new Error('Unsupported image type'));cb(null,true);}catch(e){cb(e as Error);}},
 });
 export const mediaDirectory=dir;
+
