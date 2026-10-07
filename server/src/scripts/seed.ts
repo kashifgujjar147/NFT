@@ -1,0 +1,4 @@
+import {connectDb,disconnectDb} from '../config/db.js'; import {User} from '../models/User.js'; import bcrypt from 'bcryptjs';
+const username=process.env.SEED_ADMIN_USERNAME;const password=process.env.SEED_ADMIN_PASSWORD;const mobile=process.env.SEED_ADMIN_MOBILE;
+if(!username||!password||!mobile)throw new Error('SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD and SEED_ADMIN_MOBILE are required; no default admin credentials are allowed.');
+await connectDb();const exists=await User.findOne({username:username.toLowerCase()});if(!exists){const passwordHash=await bcrypt.hash(password,12);await User.create({fullName:'Platform Administrator',username,mobile,passwordHash,memberId:'ADMIN-'+Math.random().toString(36).slice(2,8).toUpperCase(),referralCode:'ADMIN-'+Math.random().toString(36).slice(2,8).toUpperCase(),role:'super_admin'});console.log(`Created ${username}. Change the password after first login.`);}else console.log('Admin already exists.');await disconnectDb();

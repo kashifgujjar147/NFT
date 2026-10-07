@@ -1,0 +1,2 @@
+import {describe,it,expect} from 'vitest'; import {calculateWithdrawal} from '../src/utils/financial-rules.js';
+describe('negative finance cases',()=>{it('rejects non-positive withdrawals',()=>expect(()=>calculateWithdrawal(0,10)).toThrow());it('rejects invalid fee',()=>expect(()=>calculateWithdrawal(100,101)).toThrow());it('rejects non-finite money',()=>expect(()=>calculateWithdrawal(Number.NaN,10)).toThrow());});

@@ -1,0 +1,3 @@
+import {Types} from 'mongoose';
+import {Commission} from '../models/Commission.js';
+export async function commissionSummary(userId:string){const [totals,history]=await Promise.all([Commission.aggregate([{$match:{beneficiaryId:new Types.ObjectId(userId)}},{$group:{_id:'$level',amount:{$sum:'$amount'}}}]),Commission.find({beneficiaryId:userId}).sort({createdAt:-1}).limit(100).lean()]);const by=new Map(totals.map(x=>[x._id,Number(x.amount)]));return {total:[1,2,3].reduce((s,l)=>s+Number(by.get(l)??0),0),level1:Number(by.get(1)??0),level2:Number(by.get(2)??0),level3:Number(by.get(3)??0),history};}

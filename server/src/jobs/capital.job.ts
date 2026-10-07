@@ -1,0 +1,1 @@
+import {unlockDueCapital} from '../services/capital.service.js'; export function startCapitalUnlockJob(){const run=()=>unlockDueCapital().catch(err=>console.error('capital unlock job',err));run();return setInterval(run,60_000);}

@@ -1,0 +1,7 @@
+import {Request,Response} from 'express'; import {ok} from '../utils/api.js'; import {createDeposit} from '../services/deposit.service.js'; import {createWithdrawal} from '../services/withdrawal.service.js'; import {Deposit} from '../models/Deposit.js'; import {Withdrawal} from '../models/Withdrawal.js'; import {Transaction} from '../models/Transaction.js';
+function safeDeposit(d:any){const row=d.toObject?d.toObject():d;const {receiptPath,...safe}=row;return {...safe,hasReceipt:Boolean(receiptPath)};}
+export async function createDepositController(req:Request,res:Response){const body={...req.body,receiptPath:req.file?.filename??null};const d=await createDeposit(req.auth!.userId,body);return ok(res,safeDeposit(d),'Deposit submitted',201);}
+export async function depositsController(req:Request,res:Response){const rows=await Deposit.find({userId:req.auth!.userId}).sort({createdAt:-1}).limit(100).lean();return ok(res,rows.map(({receiptPath,...x})=>({...x,hasReceipt:Boolean(receiptPath)})));}
+export async function createWithdrawalController(req:Request,res:Response){return ok(res,await createWithdrawal(req.auth!.userId,req.body),'Withdrawal submitted',201);}
+export async function withdrawalsController(req:Request,res:Response){return ok(res,await Withdrawal.find({userId:req.auth!.userId}).sort({createdAt:-1}).limit(100).lean());}
+export async function transactionsController(req:Request,res:Response){return ok(res,await Transaction.find({userId:req.auth!.userId}).sort({createdAt:-1}).limit(100).lean());}

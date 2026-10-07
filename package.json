@@ -1,0 +1,27 @@
+{
+  "name": "member-capital-platform",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "typecheck": "npm run typecheck:shared && npm --workspace server run typecheck && npm --workspace client run typecheck",
+    "typecheck:shared": "tsc -p shared/tsconfig.json --noEmit",
+    "lint": "npm --workspace server run lint && npm --workspace client run lint",
+    "build": "npm --workspace server run build && npm --workspace client run build",
+    "test": "npm --workspace server run test && npm --workspace client run test",
+    "test:server": "npm --workspace server run test",
+    "test:e2e": "npm --workspace server run test:e2e",
+    "clean": "rm -rf client/dist server/dist",
+    "seed": "npm --workspace server run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,17 @@
+import {Router} from 'express';
+import {validateUploadedFileSignature} from '../utils/upload-signature.js';
+import {requireAuth,requireRoles} from '../middleware/auth.js'; import {validate} from '../middleware/validate.js'; import {idParamSchema} from '../../../shared/schemas/index.js';
+import {mediaUpload} from '../utils/media-upload.js';
+import {activeBanners,activeNotifications,dismissNotification,readNotification,notificationHistory,createBanner,updateBanner,setBannerStatus,deleteBanner,publicSettings} from '../controllers/content.controller.js';
+export const contentRouter=Router();
+contentRouter.get('/banners',activeBanners);
+contentRouter.get('/settings',publicSettings);
+contentRouter.use(requireAuth);
+contentRouter.get('/notifications',activeNotifications);
+contentRouter.get('/notifications/history',notificationHistory);
+contentRouter.post('/notifications/:id/read',validate(idParamSchema,'params'),readNotification);
+contentRouter.post('/notifications/:id/dismiss',validate(idParamSchema,'params'),dismissNotification);
+contentRouter.post('/admin/banners',requireRoles('admin','super_admin'),mediaUpload.single('image'),validateUploadedFileSignature,createBanner);
+contentRouter.patch('/admin/banners/:id',requireRoles('admin','super_admin'),validate(idParamSchema,'params'),mediaUpload.single('image'),validateUploadedFileSignature,updateBanner);
+contentRouter.post('/admin/banners/:id/status',requireRoles('admin','super_admin'),validate(idParamSchema,'params'),setBannerStatus);
+contentRouter.delete('/admin/banners/:id',requireRoles('admin','super_admin'),validate(idParamSchema,'params'),deleteBanner);

@@ -1,0 +1,9 @@
+export const ROLES = ['member','admin','super_admin'] as const;
+export type Role = typeof ROLES[number];
+export const TRANSACTION_TYPES = ['deposit','withdrawal','withdrawal_fee','withdrawal_settlement','capital','capital_unlock','profit','commission','reward','package_purchase','refund','manual_adjustment'] as const;
+export type TransactionType = typeof TRANSACTION_TYPES[number];
+export const TRANSACTION_DIRECTIONS = ['credit','debit'] as const;
+export const TRANSACTION_STATUSES = ['pending','completed','rejected','reversed'] as const;
+export const WITHDRAWAL_STATUSES = ['pending','approved','rejected','paid'] as const;
+export const DEPOSIT_STATUSES = ['pending','approved','rejected'] as const;
+export const COMMISSION_RATES = { level1: 0.10, level2: 0.02, level3: 0.01 } as const;

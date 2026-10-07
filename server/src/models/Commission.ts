@@ -1,0 +1,3 @@
+import mongoose,{Schema,model,Types} from 'mongoose';
+const schema=new Schema({beneficiaryId:{type:Types.ObjectId,ref:'User',required:true,index:true},sourceUserId:{type:Types.ObjectId,ref:'User',required:true,index:true},level:{type:Number,enum:[1,2,3],required:true},businessAmount:{type:Number,required:true,min:0},rate:{type:Number,required:true,min:0,max:1},amount:{type:Number,required:true,min:0},sourceReference:{type:String,required:true},transactionId:{type:Types.ObjectId,ref:'Transaction',default:null}},{timestamps:true}); schema.index({beneficiaryId:1,sourceReference:1,level:1},{unique:true}); export const Commission=mongoose.models.Commission||model('Commission',schema);
+

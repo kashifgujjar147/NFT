@@ -1,0 +1,10 @@
+import {Router} from 'express'; import {paymentChangeRateLimit} from '../middleware/rate-limit.js';
+import {requireAuth,requireRoles} from '../middleware/auth.js';
+import {validate} from '../middleware/validate.js';
+import {paymentChangeSchema} from '../../../shared/schemas/finance.js';
+import {paymentDetails,myPaymentRequests,requestPaymentChange} from '../controllers/payment.controller.js';
+export const paymentRouter=Router();
+paymentRouter.use(requireAuth);
+paymentRouter.get('/',paymentDetails);
+paymentRouter.get('/requests',myPaymentRequests);
+paymentRouter.post('/change-request',paymentChangeRateLimit,validate(paymentChangeSchema),requestPaymentChange);

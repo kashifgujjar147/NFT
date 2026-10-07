@@ -1,0 +1,1 @@
+import {Request,Response} from 'express'; import {ok} from '../utils/api.js'; import {commissionSummary} from '../services/commission.service.js'; export async function commission(req:Request,res:Response){return ok(res,await commissionSummary(req.auth!.userId));}
