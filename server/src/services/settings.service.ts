@@ -3,8 +3,8 @@ import {AppError} from '../utils/errors.js';
 import {audit} from './audit.service.js';
 import {withTransaction} from './ledger.service.js';
 
-const TOP_LEVEL=['platformName','theme','withdrawalsEnabled','withdrawalDisabledMessage','withdrawalFeePercent','minimumWithdrawal','maximumWithdrawal','withdrawalCooldownHours','capitalLockDays','referralRates','paymentDetails','whatsapp','telegram'] as const;
-const PAYMENT_FIELDS=['jazzCashNumber','jazzCashTitle','jazzCashActive','easypaisaNumber','easypaisaTitle','easypaisaActive','customMethods','instructions'] as const;
+const TOP_LEVEL=['platformName','theme','withdrawalsEnabled','withdrawalDisabledMessage','withdrawalFeePercent','minimumWithdrawal','maximumWithdrawal','withdrawalCooldownHours','capitalLockDays','capitalRecoveryDays','profitDurationDays','totalInvestmentDays','referralRates','paymentDetails','whatsapp','telegram'] as const;
+const PAYMENT_FIELDS=['jazzCashNumber','jazzCashTitle','jazzCashActive','easypaisaNumber','easypaisaTitle','easypaisaActive','bep20Address','bep20Network','bep20Active','customMethods','instructions'] as const;
 const RATE_FIELDS=['level1','level2','level3'] as const;
 const LINK_FIELDS=['enabled','url'] as const;
 
@@ -28,7 +28,7 @@ export async function updateSettings(patch:Record<string,unknown>,actorId:any,me
     const merged:any={...(current??{}),...clean};
     if(merged.minimumWithdrawal>merged.maximumWithdrawal)throw new AppError(422,'Minimum withdrawal cannot exceed maximum withdrawal');
     if(merged.withdrawalFeePercent<0||merged.withdrawalFeePercent>100)throw new AppError(422,'Withdrawal fee percentage is invalid');
-    if(merged.capitalLockDays<0||merged.withdrawalCooldownHours<0)throw new AppError(422,'Financial durations cannot be negative');
+    if(merged.capitalLockDays<0||merged.withdrawalCooldownHours<0||merged.capitalRecoveryDays<0||merged.profitDurationDays<0||merged.totalInvestmentDays<1)throw new AppError(422,'Financial durations cannot be negative');
     const update={$set:clean};
     const s=await AdminSettings.findOneAndUpdate({key:'global'},update,{new:true,upsert:true,runValidators:true,session});
     if(!s)throw new AppError(500,'Settings update failed');
@@ -36,4 +36,6 @@ export async function updateSettings(patch:Record<string,unknown>,actorId:any,me
     return {before:current,settings:s};
   });
 }
+
+
 
