@@ -1,15 +1,16 @@
-﻿import multer from 'multer';
+import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {env} from '../config/env.js';
 
 const serverRoot=path.resolve(process.cwd(),'server');
+const persistentMediaRoot=process.platform==='linux' && process.env.HOME ? path.join(process.env.HOME,'domains','nftfusion.shop','public_html','media') : path.join(serverRoot,'uploads','public');
 const configuredUpload=env.UPLOAD_DIR || 'uploads';
 const uploadRoot=path.isAbsolute(configuredUpload)
   ? configuredUpload
   : path.resolve(serverRoot,configuredUpload);
-const dir=path.join(uploadRoot,'public');
+const dir=persistentMediaRoot;
 
 fs.mkdirSync(uploadRoot,{recursive:true});
 fs.mkdirSync(dir,{recursive:true});
