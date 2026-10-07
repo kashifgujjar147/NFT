@@ -52,4 +52,4 @@ export const mediaUpload=multer({
   }
 });
 
-export const mediaDirectory=uploadRoot;
+export const mediaDirectory=dir;
