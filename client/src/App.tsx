@@ -65,7 +65,8 @@ function BannerCarousel({banners,loading}:{banners:any[];loading:boolean}){const
 function NotificationPopup({note}:{note:any}){const [open,setOpen]=useState(true);const [busy,setBusy]=useState(false);if(!open)return null;const close=async(dismiss:boolean)=>{setBusy(true);try{await api.post(`/content/notifications/${note._id}/${dismiss?'dismiss':'read'}`);setOpen(false)}catch{setOpen(false)}finally{setBusy(false)}};return <div className="modal-backdrop"><div className={`modal notification-modal notification-${note.type??'info'}`} style={{borderTopColor:note.color??'#D4AF37'}}><span className="eyebrow">{note.type??'NOTICE'}</span><h2>{note.title}</h2><p>{note.message}</p><div className="modal-actions"><button className="primary" disabled={busy} onClick={()=>close(!!note.dismissible)}>{busy?'Saving...':note.dismissible?'Dismiss':'Mark as read'}</button></div></div></div>}
 function Deposit(){
   const params=new URLSearchParams(location.search);
-  const requestedPackageId=params.get('packagePurchaseId')??'';
+  const requestedPackagePurchaseId=params.get('packagePurchaseId')??'';
+  const requestedPackageId=params.get('packageId')??'';
 
   const [f,setF]=useState({
     amount:'',
@@ -74,7 +75,8 @@ function Deposit(){
     details:'',
     receipt:null as File|null,
     depositType:requestedPackageId?'package':'wallet',
-    packagePurchaseId:requestedPackageId
+    packagePurchaseId:requestedPackagePurchaseId,
+    packageId:requestedPackageId
   });
 
   const [msg,setMsg]=useState('');
@@ -83,6 +85,7 @@ function Deposit(){
   const {data,loading,error,reload}=useApi<any[]>('/deposits');
   const {data:settings,loading:settingsLoading}=useApi<any>('/content/settings');
   const {data:purchases}=useApi<any[]>('/packages/purchases');
+  const {data:packages}=useApi<any[]>('/packages');
 
   const bep20=settings?.paymentDetails?.bep20Active!==false;
   const bep20Address=String(settings?.paymentDetails?.bep20Address??'').trim();
@@ -91,6 +94,30 @@ function Deposit(){
   const pendingPackage=purchases?.find(
     (p:any)=>p._id===f.packagePurchaseId&&p.status==='pending'
   );
+  const selectedPackage=packages?.find(
+    (p:any)=>p._id===f.packageId
+  );
+
+  useEffect(()=>{
+    if(selectedPackage&&f.packageId&&!f.packagePurchaseId){
+      setF((x:any)=>({
+        ...x,
+        amount:String(
+          selectedPackage.salePrice??
+          selectedPackage.price??
+          ''
+        ),
+        depositType:'package',
+        paymentMethod:'BEP20'
+      }));
+    }
+  },[
+    selectedPackage?._id,
+    selectedPackage?.salePrice,
+    selectedPackage?.price,
+    f.packageId,
+    f.packagePurchaseId
+  ]);
 
   useEffect(()=>{
     if(pendingPackage){
@@ -146,7 +173,57 @@ function Deposit(){
         body.append('receipt',f.receipt);
       }
 
-      await api.post('/deposits',body);
+      if(f.depositType==='package'&&f.packageId){
+        if(!f.receipt){
+          setMsg('NFT payment receipt upload karein.');
+          setBusy(false);
+          return;
+        }
+
+        const packageBody=new FormData();
+
+        packageBody.append(
+          'quantity',
+          '1'
+        );
+
+        packageBody.append(
+          'paymentMethod',
+          'BEP20'
+        );
+
+        packageBody.append(
+          'idempotencyKey',
+          crypto.randomUUID()
+        );
+
+        packageBody.append(
+          'amount',
+          f.amount
+        );
+
+        packageBody.append(
+          'reference',
+          f.reference
+        );
+
+        packageBody.append(
+          'details',
+          f.details
+        );
+
+        packageBody.append(
+          'receipt',
+          f.receipt
+        );
+
+        await api.post(
+          `/packages/${encodeURIComponent(f.packageId)}/purchase`,
+          packageBody
+        );
+      }else{
+        await api.post('/deposits',body);
+      }
 
       setF({
         amount:'',
@@ -155,7 +232,8 @@ function Deposit(){
         details:'',
         receipt:null,
         depositType:'wallet',
-        packagePurchaseId:''
+        packagePurchaseId:'',
+        packageId:''
       });
 
       history.replaceState(null,'','/deposit');
@@ -922,6 +1000,7 @@ function Deposit(){
 function Packages(){
   const {data,loading,error}=useApi<any[]>('/packages');
   const {data:purchases}=useApi<any[]>('/packages/purchases');
+  const {data:packages}=useApi<any[]>('/packages');
 
   const [msg,setMsg]=useState('');
   const [selected,setSelected]=useState<any>(null);
@@ -932,30 +1011,10 @@ function Packages(){
     setMsg('');
 
     try{
-      const r=await api.post(
-        `/packages/${id}/purchase`,
-        {
-          quantity:1,
-          paymentMethod:'BEP20',
-          idempotencyKey:crypto.randomUUID()
-        }
-      );
-
-      const purchase=r.data?.data??r.data;
-
-      setMsg(
-        'NFT payment created. Ab exact amount BEP20 se pay karke proof submit karein.'
-      );
-
-      if(purchase?._id){
-        location.href=
-          `/deposit?packagePurchaseId=${encodeURIComponent(purchase._id)}`;
-      }
-    }catch(err:any){
-      setMsg(
-        err?.response?.data?.message??
-        'NFT purchase request failed'
-      );
+      location.href=
+        `/deposit?packageId=${encodeURIComponent(id)}`;
+    }catch{
+      setMsg('Payment page open nahi ho saki');
     }finally{
       setBuying(false);
     }
@@ -2934,6 +2993,8 @@ function AdminBanners(){
 function assetUrl(value?:string){if(!value)return '';if(/^https?:/.test(value))return value;const base=(import.meta.env.VITE_API_URL??'/api').replace(/\/api$/,'');return `${base}${value}`;}
 function copy(value?:string){if(value)navigator.clipboard.writeText(value)}
 export default function App(){return <Routes><Route path="/login" element={<Auth/>}/><Route path="/register" element={<Auth/>}/><Route path="/forgot-password" element={<Forgot/>}/><Route path="/reset-password" element={<Reset/>}/><Route path="/" element={<Protected><Dashboard/></Protected>}/><Route path="/packages" element={<Protected><Packages/></Protected>}/><Route path="/deposit" element={<Protected><Deposit/></Protected>}/><Route path="/withdrawal" element={<Protected><Withdrawal/></Protected>}/><Route path="/team" element={<Protected><Team/></Protected>}/><Route path="/commission" element={<Protected><Commission/></Protected>}/><Route path="/account" element={<Protected><Account/></Protected>}/><Route path="/support" element={<Protected><Support/></Protected>}/><Route path="/payment-details" element={<Protected><PaymentDetails/></Protected>}/><Route path="/security" element={<Protected><Security/></Protected>}/><Route path="/transactions" element={<Protected><Transactions/></Protected>}/><Route path="/notifications" element={<Protected><Notifications/></Protected>}/><Route path="/capital" element={<Protected><Capital/></Protected>}/><Route path="/profit" element={<Protected><Profit/></Protected>}/><Route path="/rewards" element={<Protected><Rewards/></Protected>}/><Route path="/admin" element={<Protected admin><Admin/></Protected>}/><Route path="/admin/members" element={<Protected admin><AdminMembers/></Protected>}/><Route path="/admin/support" element={<Protected admin><AdminSupport/></Protected>}/><Route path="/admin/members/:id" element={<Protected admin><AdminMemberDetail/></Protected>}/><Route path="/admin/ledger" element={<Protected admin><AdminTable type="ledger"/></Protected>}/><Route path="/admin/audit" element={<Protected admin><AdminTable type="audit"/></Protected>}/><Route path="/admin/admins" element={<Protected superAdmin><AdminTable type="admins"/></Protected>}/><Route path="/admin/payment-requests" element={<Protected admin><AdminTable type="payment"/></Protected>}/><Route path="/admin/settings" element={<Protected admin><AdminSettings/></Protected>}/><Route path="/admin/finance" element={<Protected admin><AdminFinance/></Protected>}/><Route path="/admin/deposits" element={<Protected admin><AdminDeposits/></Protected>}/><Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals/></Protected>}/><Route path="/admin/packages" element={<Protected admin><AdminPackages/></Protected>}/><Route path="/admin/notifications" element={<Protected admin><AdminNotifications/></Protected>}/><Route path="/admin/banners" element={<Protected admin><AdminBanners/></Protected>}/></Routes>}
+
+
 
 
 

@@ -3,7 +3,14 @@ const safeHttpUrl=z.string().trim().url().refine(v=>/^https?:\/\//i.test(v),'Onl
 const safeWhatsApp=z.union([safeHttpUrl,z.string().trim().regex(/^\+?[0-9 ()-]{7,25}$/),z.literal('')]).transform(v=>!v?'':/^https?:\/\//i.test(v)?v:`https://wa.me/${v.replace(/\D/g,'')}`);
 export const depositCreateSchema=z.object({amount:z.coerce.number().positive().max(100000000),paymentMethod:z.enum(['JazzCash','Easypaisa','BEP20']),reference:z.string().trim().min(3).max(120),details:z.string().trim().max(1000).optional(),depositType:z.enum(['wallet','package']).default('wallet'),packagePurchaseId:z.string().trim().optional()}).superRefine((v,ctx)=>{if(v.depositType==='package'&&!v.packagePurchaseId)ctx.addIssue({code:'custom',message:'Package purchase is required',path:['packagePurchaseId']});});
 export const withdrawalCreateSchema=z.object({amount:z.coerce.number().positive().max(100000000),paymentMethod:z.enum(['JazzCash','Easypaisa','BEP20']),paymentAccount:z.string().trim().min(10).max(120).optional(),idempotencyKey:z.string().trim().min(16).max(128)});
-export const packagePurchaseSchema=z.object({quantity:z.coerce.number().int().min(1).max(100),paymentMethod:z.enum(['BEP20']).default('BEP20'),idempotencyKey:z.string().trim().min(16).max(128)});
+export const packagePurchaseSchema=z.object({
+  quantity:z.coerce.number().int().min(1).max(100),
+  paymentMethod:z.enum(['BEP20']).default('BEP20'),
+  idempotencyKey:z.string().trim().min(16).max(128),
+  amount:z.coerce.number().positive().max(100000000),
+  reference:z.string().trim().min(3).max(120),
+  details:z.string().trim().max(1000).optional()
+});
 const packageBaseSchema=z.object({name:z.string().trim().min(2).max(120),description:z.string().max(5000).default(''),price:z.coerce.number().positive(),salePrice:z.coerce.number().positive().nullable().optional(),quantity:z.coerce.number().int().min(0),active:z.boolean().default(true),startDate:z.string().datetime().nullable().optional(),endDate:z.string().datetime().nullable().optional(),limitedTimeSale:z.boolean().default(false),investmentDays:z.coerce.number().int().min(1).default(90),capitalRecoveryDays:z.coerce.number().int().min(0).default(45),profitDurationDays:z.coerce.number().int().min(0).default(45),profitPercent:z.coerce.number().min(0).default(0),images:z.array(z.string().max(500)).max(10).default([])});
 const packageRules=<T extends z.ZodTypeAny>(schema:T)=>schema.refine((v:unknown)=>{const x=v as {salePrice?:number|null;price?:number};return x.salePrice==null||x.price==null||x.salePrice<=x.price},{message:'Sale price cannot exceed regular price',path:['salePrice']}).refine((v:unknown)=>{const x=v as {startDate?:string|null;endDate?:string|null};return !x.startDate||!x.endDate||new Date(x.startDate)<new Date(x.endDate)},{message:'End date must be after start date',path:['endDate']});
 export const packageSchema=packageRules(packageBaseSchema);
@@ -16,5 +23,6 @@ export const passwordResetSchema=z.object({token:z.string().min(20),newPassword:
 
 export const paymentChangeSchema=z.object({currentPassword:z.string().min(1),jazzCash:z.string().trim().max(50).optional().default(''),easypaisa:z.string().trim().max(50).optional().default('')});
 export const paymentReviewSchema=z.object({approve:z.boolean(),reason:z.string().trim().max(1000).optional()});
+
 
 

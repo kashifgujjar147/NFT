@@ -20,7 +20,13 @@ export async function purchasePackage(
   packageId:string,
   quantity:number,
   idempotencyKey:string,
-  paymentMethod='BEP20'
+  paymentMethod='BEP20',
+  paymentInput?:{
+    amount:number;
+    reference:string;
+    details?:string;
+    receiptPath?:string|null;
+  }
 ){
   return withTransaction(async session=>{
     const existing=await PackagePurchase.findOne({
@@ -30,6 +36,13 @@ export async function purchasePackage(
 
     if(existing){
       return existing;
+    }
+
+    if(!paymentInput){
+      throw new AppError(
+        422,
+        'Payment proof is required before NFT purchase submission.'
+      );
     }
 
     const p=await PackageModel.findOne({
@@ -88,6 +101,35 @@ export async function purchasePackage(
       unit*quantity
     );
 
+    const submittedAmount=Number(paymentInput.amount);
+
+    if(!Number.isFinite(submittedAmount)||submittedAmount!==total){
+      throw new AppError(
+        422,
+        `Package payment amount must exactly match the NFT price: ${total}`
+      );
+    }
+
+    const paymentReference=String(
+      paymentInput.reference??''
+    ).trim();
+
+    if(paymentReference.length<3){
+      throw new AppError(
+        422,
+        'Transaction reference is required'
+      );
+    }
+
+    const receiptPath=paymentInput.receiptPath??null;
+
+    if(!receiptPath){
+      throw new AppError(
+        422,
+        'Payment receipt is required'
+      );
+    }
+
     const recoveryDays=Math.max(
       0,
       Number(
@@ -133,8 +175,10 @@ export async function purchasePackage(
     );
 
     /*
-     * Reserve inventory while payment is pending.
-     * The package is NOT active yet.
+     * Reserve inventory ONLY after the member has submitted
+     * the exact payment amount + TX reference + receipt.
+     *
+     * Package remains pending until admin approves the deposit.
      */
     const updated=await PackageModel.findOneAndUpdate(
       {
@@ -156,20 +200,20 @@ export async function purchasePackage(
     if(!updated){
       throw new AppError(
         409,
-        'Package sold out during purchase'
+        'Package sold out during payment submission'
       );
     }
 
-    const reference=`PUR-${new mongoose.Types.ObjectId()}`;
+    const purchaseReference=generateReference('PUR');
 
     const purchase=(
       await PackagePurchase.create([{
         userId,
-        packageId,
+        packageId:p._id,
         quantity,
         unitPrice:unit,
         totalAmount:total,
-        reference,
+        reference:purchaseReference,
         idempotencyKey,
 
         status:'pending',
@@ -193,17 +237,16 @@ export async function purchasePackage(
       }],{session})
     )[0];
 
-    /*
-     * Create the exact external payment/deposit request.
-     * It remains pending until admin verifies the transaction.
-     */
     const deposit=(
       await Deposit.create([{
         userId,
         amount:total,
         paymentMethod,
-        reference:generateReference('NFT'),
-        details:`NFT/package payment for ${p.name}`,
+        reference:paymentReference,
+        details:String(
+          paymentInput.details??''
+        ).trim(),
+        receiptPath,
         depositType:'package',
         packagePurchaseId:purchase._id,
         status:'pending'
@@ -211,28 +254,12 @@ export async function purchasePackage(
     )[0];
 
     purchase.paymentDepositId=deposit._id;
-    await purchase.save({session});
 
-    await audit({
-      actorId:userId,
-      action:'package.purchase.pending',
-      targetType:'PackagePurchase',
-      targetId:purchase._id.toString(),
-      after:purchase.toObject(),
-      metadata:{
-        depositId:deposit._id.toString(),
-        packageId:p._id.toString(),
-        packageName:p.name,
-        exactAmount:total,
-        paymentMethod,
-        remainingQuantity:updated.remainingQuantity
-      }
-    },{session});
+    await purchase.save({session});
 
     return purchase;
   });
 }
-
 export async function matureDuePackages(){
   const now=new Date();
 
@@ -356,3 +383,4 @@ export async function matureDuePackages(){
     matured
   };
 }
+
