@@ -339,8 +339,8 @@ function Deposit(){
             </button>
 
             <p className="muted">
-              Sirf isi network par payment bhejein. Wrong network/address
-              ki payment ko platform recover nahi kar sakta.
+              Only send payment on this network. Payment sent to the wrong network/address 
+              cannot be recovered by the platform.
             </p>
           </div>
         </div>
@@ -372,9 +372,6 @@ function Deposit(){
         </div>
 
         <p>
-          Is exact amount ka BEP20 payment bhej kar neeche
-          transaction reference aur proof submit karein.
-          Admin approval ke baad hi NFT activate hoga.
         </p>
       </section>
     }
@@ -389,8 +386,6 @@ function Deposit(){
       </p>
 
       <small>
-        Deposit status initially Pending hota hai.
-        Funds/package sirf administrator verification ke baad approve/activate hoga.
       </small>
     </section>
 
@@ -606,7 +601,7 @@ function Deposit(){
     e.preventDefault();
 
     if(isBep20&&f.paymentAccount.trim().length<10){
-      setMsg('Valid BEP20 withdrawal address enter karein.');
+      setMsg('Enter a valid BEP20 withdrawal address.');
       return;
     }
 
@@ -629,9 +624,7 @@ function Deposit(){
         paymentAccount:''
       });
 
-      setMsg(
-        'Withdrawal Pending ho gaya hai. Admin verification/payment process ke baad hi complete hoga.'
-      );
+     
     }catch(err:any){
       setMsg(
         err?.response?.data?.message??
@@ -687,8 +680,6 @@ function Deposit(){
         <span className="eyebrow">REQUEST WITHDRAWAL</span>
         <h2>Withdrawal details</h2>
         <p>
-          Requested amount mein se fixed admin fee deduct hogi.
-          Admin ko sirf net amount pay karna hoga.
         </p>
       </div>
 
@@ -744,7 +735,7 @@ function Deposit(){
           />
 
           <small className="muted">
-            Admin isi address par net amount pay karega.
+           
           </small>
         </section>
       }
@@ -975,9 +966,7 @@ function Deposit(){
       </p>
 
       <div className="notice">
-        Purchase ke baad exact NFT price ka BEP20 payment
-        Pending verification ke liye create hoga.
-        Admin approval ke baad package activate hoga.
+
       </div>
 
       <button
@@ -1178,8 +1167,7 @@ function Packages(){
         <h2>Pending NFT Payments</h2>
 
         <p className="muted">
-          In purchases ka exact payment abhi admin verification
-          ka wait kar raha hai.
+         
         </p>
 
         <div className="list">
@@ -2463,8 +2451,6 @@ function AdminSettings(){
       <h2>Investment timing controls</h2>
 
       <p className="muted">
-        Yeh values future NFT/package defaults control karti hain.
-        Existing packages par unki saved settings apply hongi.
       </p>
 
       <div className="form-grid">
@@ -2552,8 +2538,6 @@ function AdminSettings(){
         />
 
         <p className="muted">
-          Member Deposit aur NFT payment screen par isi
-          address ka copy button aur QR show hoga.
         </p>
       </div>
 
