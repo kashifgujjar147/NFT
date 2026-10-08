@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+﻿import crypto from 'node:crypto';
 import {Deposit} from '../models/Deposit.js';
 import {PackagePurchase} from '../models/PackagePurchase.js';
 import {PackageModel} from '../models/Package.js';
@@ -172,35 +172,68 @@ export async function approveDeposit(
 
       const recoveryDays=Math.max(
         0,
-        Number(purchase.capitalRecoveryDays??45)
+        Number(purchase.capitalRecoveryDays??0)
       );
 
       const profitDays=Math.max(
         0,
-        Number(purchase.profitDurationDays??45)
+        Number(purchase.profitDurationDays??0)
       );
 
       const totalDays=Math.max(
         1,
-        Number(purchase.investmentDays??(recoveryDays+profitDays))
+        Number(purchase.investmentDays??1)
       );
 
-      purchase.status=recoveryDays>0?'capital_recovery':'profit';
+      const profitPercent=Math.max(
+        0,
+        Number(purchase.profitPercent??0)
+      );
+
+      const dailyProfitAmount=Number(
+        (
+          Number(purchase.totalAmount)*profitPercent/100
+        ).toFixed(2)
+      );
+
+      /*
+       * Package daily-profit system:
+       *
+       * The package becomes active immediately after
+       * admin approves its external payment.
+       *
+       * Profit is NOT paid upfront.
+       * The first profit becomes due exactly 24 hours
+       * after activation.
+       *
+       * Principal remains separate and is never credited
+       * into the available balance by this package job.
+       */
+      purchase.status='active';
       purchase.purchasedAt=now;
       purchase.activatedAt=now;
+
       purchase.capitalRecoveryDays=recoveryDays;
       purchase.profitDurationDays=profitDays;
       purchase.investmentDays=totalDays;
 
-      purchase.capitalRecoveryAt=
-        recoveryDays>0
-          ? new Date(now.getTime()+recoveryDays*86400000)
-          : now;
-
-      purchase.profitStartsAt=purchase.capitalRecoveryAt;
+      purchase.capitalRecoveryAt=null;
+      purchase.profitStartsAt=null;
 
       purchase.maturesAt=
         new Date(now.getTime()+totalDays*86400000);
+
+      purchase.profitPercent=profitPercent;
+      purchase.dailyProfitAmount=dailyProfitAmount;
+
+      purchase.lastProfitAt=null;
+      purchase.nextProfitAt=
+        new Date(now.getTime()+86400000);
+
+      purchase.profitCyclesCredited=0;
+
+      purchase.profitAmount=0;
+      purchase.payoutAmount=0;
 
       await purchase.save({session});
 
@@ -214,9 +247,11 @@ export async function approveDeposit(
           totalAmount:purchase.totalAmount,
           packageId:purchase.packageId.toString(),
           activatedAt:purchase.activatedAt,
-          capitalRecoveryAt:purchase.capitalRecoveryAt,
-          profitStartsAt:purchase.profitStartsAt,
-          maturesAt:purchase.maturesAt
+          maturesAt:purchase.maturesAt,
+          profitPercent:purchase.profitPercent,
+          dailyProfitAmount:purchase.dailyProfitAmount,
+          nextProfitAt:purchase.nextProfitAt,
+          profitCyclesCredited:purchase.profitCyclesCredited
         },
         metadata:{
           depositId:d._id.toString(),
@@ -319,6 +354,7 @@ export async function rejectDeposit(
 export function generateReference(prefix:string){
   return `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
+
 
 
 

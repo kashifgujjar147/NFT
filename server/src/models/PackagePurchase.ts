@@ -30,8 +30,19 @@ const schema=new Schema({
   maturesAt:{type:Date,default:null},
 
   profitPercent:{type:Number,default:0,min:0},
+
+  // Daily package profit amount.
+  // Example: $100 package at 2% = $2 every 24 hours.
+  dailyProfitAmount:{type:Number,default:0,min:0},
+
+  // Kept for compatibility with existing package data/UI.
   profitAmount:{type:Number,default:0,min:0},
   payoutAmount:{type:Number,default:0,min:0},
+
+  // Daily 24-hour profit cycle tracking.
+  lastProfitAt:{type:Date,default:null},
+  nextProfitAt:{type:Date,default:null},
+  profitCyclesCredited:{type:Number,default:0,min:0},
 
   paymentDepositId:{type:Types.ObjectId,ref:'Deposit',default:null},
 
@@ -42,5 +53,7 @@ schema.index({userId:1,purchasedAt:-1});
 schema.index({status:1,capitalRecoveryAt:1});
 schema.index({status:1,profitStartsAt:1});
 schema.index({status:1,maturesAt:1});
+schema.index({status:1,nextProfitAt:1});
 
 export const PackagePurchase=mongoose.models.PackagePurchase||model('PackagePurchase',schema);
+

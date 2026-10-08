@@ -264,122 +264,216 @@ export async function matureDuePackages(){
   const now=new Date();
 
   /*
-   * Capital recovery -> profit phase.
-   */
-  const recoveryDue=await PackagePurchase.find({
-    status:'capital_recovery',
-    profitStartsAt:{$lte:now}
-  }).limit(500);
-
-  let movedToProfit=0;
-
-  for(const item of recoveryDue){
-    const changed=await withTransaction(async session=>{
-      const purchase=await PackagePurchase.findOne({
-        _id:item._id,
-        status:'capital_recovery',
-        profitStartsAt:{$lte:now}
-      }).session(session);
-
-      if(!purchase){
-        return false;
-      }
-
-      purchase.status='profit';
-      await purchase.save({session});
-
-      await audit({
-        actorId:purchase.userId,
-        action:'package.profit.start',
-        targetType:'PackagePurchase',
-        targetId:purchase._id.toString(),
-        after:{
-          status:'profit',
-          profitStartsAt:purchase.profitStartsAt
-        }
-      },{session});
-
-      return true;
-    });
-
-    if(changed){
-      movedToProfit++;
-    }
-  }
-
-  /*
-   * Profit -> matured.
+   * Package daily-profit job.
    *
-   * The principal + configured profit is credited once.
+   * Every package gets one profit cycle per 24 hours.
+   * The daily profit is:
+   *
+   * totalAmount * profitPercent / 100
+   *
+   * Principal is never credited here.
+   *
+   * A unique transaction reference is generated for every
+   * cycle so the same cycle cannot be credited twice.
    */
   const due=await PackagePurchase.find({
-    status:'profit',
-    maturesAt:{$lte:now}
+    status:'active',
+    nextProfitAt:{$lte:now}
   }).limit(500);
 
+  let credited=0;
   let matured=0;
 
   for(const item of due){
-    const changed=await withTransaction(async session=>{
+
+    const result=await withTransaction(async session=>{
+
       const purchase=await PackagePurchase.findOne({
         _id:item._id,
-        status:'profit',
-        maturesAt:{$lte:now}
+        status:'active',
+        nextProfitAt:{$lte:now}
       }).session(session);
 
       if(!purchase){
-        return false;
+        return {
+          credited:0,
+          matured:false
+        };
       }
 
-      purchase.status='matured';
-      await purchase.save({session});
+      const activatedAt=
+        purchase.activatedAt ??
+        purchase.purchasedAt ??
+        purchase.createdAt;
+
+      if(!activatedAt){
+        return {
+          credited:0,
+          matured:false
+        };
+      }
+
+      const cycleLength=86400000;
+
+      const totalCycles=Math.max(
+        1,
+        Number(purchase.investmentDays??1)
+      );
+
+      const elapsedCycles=Math.floor(
+        (
+          now.getTime()-
+          new Date(activatedAt).getTime()
+        )/
+        cycleLength
+      );
+
+      const dueCycles=Math.min(
+        totalCycles,
+        Math.max(0,elapsedCycles)
+      );
+
+      let cyclesCredited=Number(
+        purchase.profitCyclesCredited??0
+      );
+
+      const dailyProfitAmount=money(
+        Number(
+          purchase.dailyProfitAmount ??
+          (
+            Number(purchase.totalAmount)*
+            Number(purchase.profitPercent??0)/100
+          )
+        )
+      );
+
+      let creditedThisRun=0;
 
       const {ledgerEntry}=await import(
         './ledger.service.js'
       );
 
-      const tx=await ledgerEntry({
-        userId:purchase.userId,
-        type:'profit',
-        amount:purchase.payoutAmount,
-        direction:'credit',
-        reference:`PKG-MATURE-${purchase._id}`,
-        description:'NFT package investment matured',
-        relatedEntity:purchase._id,
-        metadata:{
-          packageId:purchase.packageId.toString(),
-          principal:purchase.totalAmount,
-          profitPercent:purchase.profitPercent,
-          profitAmount:purchase.profitAmount,
-          payoutAmount:purchase.payoutAmount,
-          capitalRecoveryDays:purchase.capitalRecoveryDays,
-          profitDurationDays:purchase.profitDurationDays,
-          maturesAt:purchase.maturesAt
+      const {Transaction}=await import(
+        '../models/Transaction.js'
+      );
+
+      while(cyclesCredited<dueCycles){
+
+        const cycleNumber=cyclesCredited+1;
+
+        const reference=
+          `PKG-DAILY-${purchase._id}-${cycleNumber}`;
+
+        /*
+         * Transaction.reference is unique.
+         * This check makes the operation safe if the job
+         * encounters a previously-created cycle.
+         */
+        const existing=await Transaction.findOne({
+          reference
+        }).session(session);
+
+        if(!existing && dailyProfitAmount>0){
+
+          await ledgerEntry({
+            userId:purchase.userId,
+            type:'profit',
+            amount:dailyProfitAmount,
+            direction:'credit',
+            reference,
+            description:
+              `Package daily profit - cycle ${cycleNumber}`,
+            relatedEntity:purchase._id,
+            metadata:{
+              packageId:purchase.packageId.toString(),
+              packagePurchaseId:purchase._id.toString(),
+              cycleNumber,
+              dailyProfitPercent:purchase.profitPercent,
+              dailyProfitAmount,
+              activatedAt,
+              cycleDueAt:new Date(
+                new Date(activatedAt).getTime()+
+                cycleNumber*cycleLength
+              ),
+              maturesAt:purchase.maturesAt
+            }
+          },{session});
+
+          creditedThisRun++;
         }
-      },{session});
+
+        cyclesCredited=cycleNumber;
+      }
+
+      purchase.profitCyclesCredited=cyclesCredited;
+
+      if(cyclesCredited>0){
+
+        purchase.lastProfitAt=new Date(
+          new Date(activatedAt).getTime()+
+          cyclesCredited*cycleLength
+        );
+
+        purchase.nextProfitAt=new Date(
+          new Date(activatedAt).getTime()+
+          (cyclesCredited+1)*cycleLength
+        );
+      }
+
+      let becameMatured=false;
+
+      if(
+        purchase.maturesAt &&
+        now>=purchase.maturesAt &&
+        cyclesCredited>=totalCycles
+      ){
+
+        purchase.status='matured';
+        purchase.nextProfitAt=null;
+
+        becameMatured=true;
+      }
+
+      await purchase.save({session});
 
       await audit({
         actorId:purchase.userId,
-        action:'package.mature',
+        action:
+          creditedThisRun>0
+            ? 'package.daily_profit'
+            : becameMatured
+              ? 'package.mature'
+              : 'package.daily_profit.check',
         targetType:'PackagePurchase',
         targetId:purchase._id.toString(),
-        after:purchase.toObject(),
+        after:{
+          status:purchase.status,
+          dailyProfitAmount,
+          profitCyclesCredited:purchase.profitCyclesCredited,
+          lastProfitAt:purchase.lastProfitAt,
+          nextProfitAt:purchase.nextProfitAt,
+          maturesAt:purchase.maturesAt
+        },
         metadata:{
-          transactionId:tx.transactionId,
-          payoutAmount:purchase.payoutAmount
+          creditedCycles:creditedThisRun
         }
       },{session});
 
-      return true;
+      return {
+        credited:creditedThisRun,
+        matured:becameMatured
+      };
     });
 
-    if(changed){
+    credited+=result.credited;
+
+    if(result.matured){
       matured++;
     }
   }
 
   return {
-    movedToProfit,
+    credited,
     matured
   };
 }
