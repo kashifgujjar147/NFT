@@ -67,9 +67,10 @@ function Deposit(){
   const params=new URLSearchParams(location.search);
   const requestedPackagePurchaseId=params.get('packagePurchaseId')??'';
   const requestedPackageId=params.get('packageId')??'';
+  const requestedAmount=params.get('amount')??'';
 
   const [f,setF]=useState({
-    amount:'',
+    amount:requestedAmount,
     paymentMethod:'BEP20',
     reference:'',
     details:'',
@@ -869,7 +870,7 @@ function Deposit(){
 }:{
   p:any;
   onBack:()=>void;
-  onBuy:(id:string)=>void;
+  onBuy:(id:string,amount:number)=>void;
   busy:boolean
 }){
   const price=Number(
@@ -985,7 +986,7 @@ function Deposit(){
           busy||
           Number(p.remainingQuantity??0)<=0
         }
-        onClick={()=>onBuy(p._id)}
+        onClick={()=>onBuy(p._id,price)}
       >
         {busy
           ?'Creating payment...'
@@ -1006,13 +1007,13 @@ function Packages(){
   const [selected,setSelected]=useState<any>(null);
   const [buying,setBuying]=useState(false);
 
-  const buy=async(id:string)=>{
+  const buy=async(id:string,amount:number)=>{
     setBuying(true);
     setMsg('');
 
     try{
       location.href=
-        `/deposit?packageId=${encodeURIComponent(id)}`;
+        `/deposit?packageId=&amount=${encodeURIComponent(id)}`;
     }catch{
       setMsg('Payment page open nahi ho saki');
     }finally{
@@ -1160,7 +1161,7 @@ function Packages(){
                     buying||
                     Number(p.remainingQuantity??0)<1
                   }
-                  onClick={()=>buy(p._id)}
+                  onClick={()=>buy(p._id,Number(p.salePrice??p.price??0))}
                 >
                   {buying
                     ?'Processing...'
@@ -2993,6 +2994,10 @@ function AdminBanners(){
 function assetUrl(value?:string){if(!value)return '';if(/^https?:/.test(value))return value;const base=(import.meta.env.VITE_API_URL??'/api').replace(/\/api$/,'');return `${base}${value}`;}
 function copy(value?:string){if(value)navigator.clipboard.writeText(value)}
 export default function App(){return <Routes><Route path="/login" element={<Auth/>}/><Route path="/register" element={<Auth/>}/><Route path="/forgot-password" element={<Forgot/>}/><Route path="/reset-password" element={<Reset/>}/><Route path="/" element={<Protected><Dashboard/></Protected>}/><Route path="/packages" element={<Protected><Packages/></Protected>}/><Route path="/deposit" element={<Protected><Deposit/></Protected>}/><Route path="/withdrawal" element={<Protected><Withdrawal/></Protected>}/><Route path="/team" element={<Protected><Team/></Protected>}/><Route path="/commission" element={<Protected><Commission/></Protected>}/><Route path="/account" element={<Protected><Account/></Protected>}/><Route path="/support" element={<Protected><Support/></Protected>}/><Route path="/payment-details" element={<Protected><PaymentDetails/></Protected>}/><Route path="/security" element={<Protected><Security/></Protected>}/><Route path="/transactions" element={<Protected><Transactions/></Protected>}/><Route path="/notifications" element={<Protected><Notifications/></Protected>}/><Route path="/capital" element={<Protected><Capital/></Protected>}/><Route path="/profit" element={<Protected><Profit/></Protected>}/><Route path="/rewards" element={<Protected><Rewards/></Protected>}/><Route path="/admin" element={<Protected admin><Admin/></Protected>}/><Route path="/admin/members" element={<Protected admin><AdminMembers/></Protected>}/><Route path="/admin/support" element={<Protected admin><AdminSupport/></Protected>}/><Route path="/admin/members/:id" element={<Protected admin><AdminMemberDetail/></Protected>}/><Route path="/admin/ledger" element={<Protected admin><AdminTable type="ledger"/></Protected>}/><Route path="/admin/audit" element={<Protected admin><AdminTable type="audit"/></Protected>}/><Route path="/admin/admins" element={<Protected superAdmin><AdminTable type="admins"/></Protected>}/><Route path="/admin/payment-requests" element={<Protected admin><AdminTable type="payment"/></Protected>}/><Route path="/admin/settings" element={<Protected admin><AdminSettings/></Protected>}/><Route path="/admin/finance" element={<Protected admin><AdminFinance/></Protected>}/><Route path="/admin/deposits" element={<Protected admin><AdminDeposits/></Protected>}/><Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals/></Protected>}/><Route path="/admin/packages" element={<Protected admin><AdminPackages/></Protected>}/><Route path="/admin/notifications" element={<Protected admin><AdminNotifications/></Protected>}/><Route path="/admin/banners" element={<Protected admin><AdminBanners/></Protected>}/></Routes>}
+
+
+
+
 
 
 
