@@ -1,4 +1,4 @@
-﻿import mongoose,{Schema,model,InferSchemaType,Model} from 'mongoose';
+import mongoose,{Schema,model,InferSchemaType,Model} from 'mongoose';
 
 const schema=new Schema({
   key:{type:String,unique:true,default:'global'},
@@ -33,7 +33,7 @@ const schema=new Schema({
   withdrawalFeePercent:{type:Number,default:10,min:0,max:100},
   minimumWithdrawal:{type:Number,default:0,min:0},
   maximumWithdrawal:{type:Number,default:100000000,min:0},
-  withdrawalCooldownHours:{type:Number,default:24,min:0},
+  withdrawalCooldownHours:{type:Number,default:24,min:0},dailyProfitPercent:{type:Number,default:1,min:0,max:100},
 
   capitalLockDays:{type:Number,default:45,min:0},
 
