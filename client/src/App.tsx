@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import type {ReactNode,FormEvent} from 'react';
 import {Link,Routes,Route,useNavigate,useParams, NavLink} from 'react-router-dom';
 import {api,setAccessToken,getAccessToken} from './lib/api';
-import {House,Gem,WalletCards,ArrowUpRight,MessageCircle,UserRound} from 'lucide-react';
+import {House,Gem, Package, WalletCards,ArrowUpRight,MessageCircle,UserRound} from 'lucide-react';
 
 type ApiState<T>={data:T|null;loading:boolean;error:string};
 function useApi<T>(url:string):ApiState<T>&{reload:()=>void}{const [data,setData]=useState<T|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);useEffect(()=>{let live=true;setLoading(true);api.get(url).then(r=>live&&setData(r.data.data)).catch(e=>live&&setError(e?.response?.data?.message??'Unable to load')).finally(()=>live&&setLoading(false));return()=>{live=false};},[url,refresh]);return {data,loading,error,reload:()=>setRefresh(v=>v+1)};}
@@ -54,7 +54,7 @@ function Shell({children,title='NEXUS MEMBER'}:{children:ReactNode;title?:string
       </div>
     </header>
     <main className="content">{children}</main>
-    <nav className="bottom"><NavLink to="/" end><span className="nav-icon"><House size={22}/></span><span>Home</span></NavLink><NavLink to="/packages"><span className="nav-icon"><Gem size={22}/></span><span>NFT</span></NavLink><NavLink to="/deposit"><span className="nav-icon"><WalletCards size={22}/></span><span>Deposit</span></NavLink><NavLink to="/withdrawal"><span className="nav-icon"><ArrowUpRight size={22}/></span><span>Withdraw</span></NavLink><NavLink to="/support"><span className="nav-icon"><MessageCircle size={22}/></span><span>Support</span></NavLink><NavLink to="/account"><span className="nav-icon"><UserRound size={22}/></span><span>Account</span></NavLink></nav>
+    <nav className="bottom"><NavLink to="/" end><span className="nav-icon"><House size={22}/></span><span>Home</span></NavLink><NavLink to="/packages"><span className="nav-icon"><Gem size={22}/></span><span>NFT</span></NavLink><NavLink to="/active-packages"><span className="nav-icon"><Package size={22}/></span><span>Packages</span></NavLink><NavLink to="/deposit"><span className="nav-icon"><WalletCards size={22}/></span><span>Deposit</span></NavLink><NavLink to="/withdrawal"><span className="nav-icon"><ArrowUpRight size={22}/></span><span>Withdraw</span></NavLink><NavLink to="/support"><span className="nav-icon"><MessageCircle size={22}/></span><span>Support</span></NavLink><NavLink to="/account"><span className="nav-icon"><UserRound size={22}/></span><span>Account</span></NavLink></nav>
   </div>
 }
 function Auth(){const n=useNavigate();const [mode,setMode]=useState<'login'|'register'>('login');const referralFromUrl=new URLSearchParams(location.search).get('ref')?.trim()??'';const [form,setForm]=useState({username:'',password:'',fullName:'',mobile:'',email:'',referralCode:mode==='register'?referralFromUrl:'',jazzCash:'',easypaisa:''});useEffect(()=>{if(mode==='register'&&referralFromUrl)setForm(f=>({...f,referralCode:referralFromUrl.toUpperCase()}));},[mode,referralFromUrl]);const [error,setError]=useState('');const submit=async(e:FormEvent)=>{e.preventDefault();setError('');try{const body=mode==='login'?{username:form.username,password:form.password}:{...form,paymentDetails:{jazzCash:form.jazzCash,easypaisa:form.easypaisa}};const r=await api.post(mode==='login'?'/auth/login':'/auth/register',body);setAccessToken(r.data.data.accessToken);localStorage.setItem('member',JSON.stringify(r.data.data.user));localStorage.setItem('showWhatsappJoinPrompt','1');n('/');}catch(err:any){setError(err?.response?.data?.message??'Request failed')}};return <main className="auth"><div className="auth-card"><div className="brand">NEXUS<span>MEMBER</span></div><h1>{mode==='login'?'Welcome back':'Create your account'}</h1><p className="muted">Secure member workspace with server-authoritative financial data.</p>{error&&<div className="alert">{error}</div>}<form onSubmit={submit}>{mode==='register'&&<><input required placeholder="Full name" value={form.fullName} onChange={e=>setForm({...form,fullName:e.target.value})}/><input required placeholder="Mobile number" value={form.mobile} onChange={e=>setForm({...form,mobile:e.target.value})}/><input required type="email" placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/><input placeholder="Referral code" value={form.referralCode} readOnly={Boolean(referralFromUrl)} onChange={e=>setForm({...form,referralCode:e.target.value.toUpperCase()})}/></>}<input required placeholder="Username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})}/><input required type="password" minLength={10} placeholder="Password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><button className="primary">{mode==='login'?'Sign in':'Register'}</button></form>{mode==='login'&&<Link className="back-link" to="/forgot-password">Forgot password?</Link>}<button className="link-btn" onClick={()=>setMode(mode==='login'?'register':'login')}>{mode==='login'?'Create a new account':'Already have an account?'}</button></div></main>}
@@ -246,6 +246,11 @@ function Deposit(){
           ?'NFT payment proof submitted. Package will activate only after admin verification.'
           :'BEP20 deposit submitted. Balance will be credited only after admin verification.'
       );
+
+      if(f.depositType==='package'){
+        location.href='/active-packages';
+        return;
+      }
     }catch(err:any){
       setMsg(
         err?.response?.data?.message??
@@ -1000,7 +1005,7 @@ function Packages(){
 
     try{
       location.href=
-        `/deposit?packageId=&amount=${encodeURIComponent(id)}`;
+        `/deposit?packageId=${encodeURIComponent(id)}&amount=${encodeURIComponent(amount)}`;
     }catch{
       setMsg('Payment page open nahi ho saki');
     }finally{
@@ -1282,7 +1287,149 @@ function Packages(){
       ]}
     />
   </Shell>
-}function PackageMaturity({end,status}:{end:string,status:string}){const [left,setLeft]=useState(Math.max(0,new Date(end).getTime()-Date.now()));useEffect(()=>{const i=setInterval(()=>setLeft(Math.max(0,new Date(end).getTime()-Date.now())),1000);return()=>clearInterval(i)},[end]);if(status==='matured'||left<=0)return <span className='countdown'>Matured</span>;return <span className='countdown'>Matures in {Math.floor(left/86400000)}d {Math.floor(left/3600000)%24}h {Math.floor(left/60000)%60}m</span>}function Countdown({end}:{end:string}){const [left,setLeft]=useState(Math.max(0,new Date(end).getTime()-Date.now()));useEffect(()=>{const i=setInterval(()=>setLeft(Math.max(0,new Date(end).getTime()-Date.now())),1000);return()=>clearInterval(i)},[end]);return <span className="countdown">Sale ends in {Math.floor(left/86400000)}d {Math.floor(left/3600000)%24}h {Math.floor(left/60000)%60}m</span>}
+}function ActivePackages(){
+  const {data:rows,loading,error,reload}=useApi<any[]>('/packages/purchases');
+
+  const purchases=rows??[];
+
+  const active=purchases.filter((p:any)=>
+    ['active','capital_recovery','profit'].includes(String(p.status))
+  );
+
+  const pending=purchases.filter((p:any)=>
+    String(p.status)==='pending'
+  );
+
+  const history=purchases.filter((p:any)=>
+    !['active','capital_recovery','profit','pending'].includes(String(p.status))
+  );
+
+  return <Shell>
+    <PageTitle
+      title="My Packages"
+      text="Your purchased NFT packages, activation status and investment schedule."
+    />
+
+    <div className="grid">
+      <Card title="Active Packages" value={String(active.length)} />
+      <Card title="Pending Packages" value={String(pending.length)} />
+      <Card
+        title="Active Units"
+        value={String(active.reduce((n,p)=>n+Number(p.quantity??0),0))}
+      />
+      <Card
+        title="Active Value"
+        value={`$${active.reduce((n,p)=>n+Number(p.totalAmount??0),0).toFixed(2)}`}
+      />
+    </div>
+
+    {loading
+      ?<p>Loading packages...</p>
+      :error
+        ?<div className="alert">{error}<button onClick={reload}>Retry</button></div>
+        :<>
+          <section className="panel">
+            <div className="section-heading">
+              <span className="eyebrow">ACTIVE PACKAGES</span>
+              <h2>My Active Packages</h2>
+            </div>
+
+            {active.length
+              ?<div className="list">
+                {active.map((p:any)=>{
+                  const pkg=typeof p.packageId==='object'?p.packageId:null;
+                  return <div className="row" key={p._id}>
+                    <span>
+                      <strong>{pkg?.name??p.packageName??'Package'}</strong>
+                      <br/>
+                      <small>
+                        Activated:{' '}
+                        {p.activatedAt
+                          ?new Date(p.activatedAt).toLocaleString()
+                          :'-'}
+                      </small>
+                    </span>
+                    <span>
+                      Amount<br/>
+                      <strong>${Number(p.totalAmount??0).toFixed(2)}</strong>
+                    </span>
+                    <span>
+                      Capital recovery<br/>
+                      {p.capitalRecoveryAt
+                        ?new Date(p.capitalRecoveryAt).toLocaleString()
+                        :'-'}
+                    </span>
+                    <span>
+                      Profit starts<br/>
+                      {p.profitStartsAt
+                        ?new Date(p.profitStartsAt).toLocaleString()
+                        :'-'}
+                    </span>
+                    <span>
+                      Matures<br/>
+                      {p.maturesAt
+                        ?new Date(p.maturesAt).toLocaleString()
+                        :'-'}
+                    </span>
+                    <span>
+                      Profit ${Number(p.profitAmount??0).toFixed(2)}
+                      <br/>
+                      Payout ${Number(p.payoutAmount??0).toFixed(2)}
+                    </span>
+                    <strong>{p.status}</strong>
+                  </div>
+                })}
+              </div>
+              :<p className="muted">No active packages yet. Packages become active after payment verification.</p>}
+          </section>
+
+          {pending.length>0&&
+            <section className="panel">
+              <div className="section-heading">
+                <span className="eyebrow">PENDING VERIFICATION</span>
+                <h2>Pending Packages</h2>
+              </div>
+              <div className="list">
+                {pending.map((p:any)=>{
+                  const pkg=typeof p.packageId==='object'?p.packageId:null;
+                  return <div className="row" key={p._id}>
+                    <span>
+                      <strong>{pkg?.name??p.packageName??'Package'}</strong>
+                      <br/>
+                      <small>
+                        Submitted:{' '}
+                        {p.createdAt
+                          ?new Date(p.createdAt).toLocaleString()
+                          :'-'}
+                      </small>
+                    </span>
+                    <span>${Number(p.totalAmount??0).toFixed(2)}</span>
+                    <strong>Pending</strong>
+                    <button
+                      onClick={()=>
+                        location.href=
+                          `/deposit?packagePurchaseId=${encodeURIComponent(p._id)}`
+                      }
+                    >
+                      Submit Payment Proof
+                    </button>
+                  </div>
+                })}
+              </div>
+            </section>
+          }
+
+          {history.length>0&&
+            <List
+              title="Package History"
+              rows={history}
+              cols={['reference','quantity','totalAmount','createdAt','status']}
+            />
+          }
+        </>}
+  </Shell>
+}
+function PackageMaturity({end,status}:{end:string,status:string}){const [left,setLeft]=useState(Math.max(0,new Date(end).getTime()-Date.now()));useEffect(()=>{const i=setInterval(()=>setLeft(Math.max(0,new Date(end).getTime()-Date.now())),1000);return()=>clearInterval(i)},[end]);if(status==='matured'||left<=0)return <span className='countdown'>Matured</span>;return <span className='countdown'>Matures in {Math.floor(left/86400000)}d {Math.floor(left/3600000)%24}h {Math.floor(left/60000)%60}m</span>}function Countdown({end}:{end:string}){const [left,setLeft]=useState(Math.max(0,new Date(end).getTime()-Date.now()));useEffect(()=>{const i=setInterval(()=>setLeft(Math.max(0,new Date(end).getTime()-Date.now())),1000);return()=>clearInterval(i)},[end]);return <span className="countdown">Sale ends in {Math.floor(left/86400000)}d {Math.floor(left/3600000)%24}h {Math.floor(left/60000)%60}m</span>}
 function Team(){const {data,loading,error}=useApi<any>("/members/summary");const team=data?.team??{};return <Shell><PageTitle title="Three-level team" text="Team membership, business and commission are resolved on the server."/>{loading?<p>Loading...</p>:error?<div className="alert">{error}</div>:<><div className="grid"><Card title="Total Team Members" value={String(team.total??0)}/><Card title="Total Team Business" value={`$${Number(team.totalBusiness??0).toFixed(2)}`}/><Card title="Total Commission" value={`$${Number(team.totalCommission??0).toFixed(2)}`}/></div><div className="team-columns">{[1,2,3].map(level=>{const members=team[`level${level}`]??[];return <section className="panel" key={level}><h2>Level {level}</h2><p><strong>{members.length}</strong> members</p><p>Business: <strong>${Number(team.levelBusiness?.[`level${level}`]??0).toFixed(2)}</strong></p><p>Commission: <strong>${Number(team.levelCommission?.[`level${level}`]??0).toFixed(2)}</strong></p>{members.map((u:any)=><div className="row" key={u._id}><span><strong>{u.username}</strong><br/><small>{u.fullName??""}</small></span><span><small>{u.memberId}</small><br/>Business ${Number(u.business??0).toFixed(2)} · Commission ${Number(u.commission??0).toFixed(2)}</span></div>)}</section>})}</div></>}</Shell>}function Commission(){const {data,loading}=useApi<any>('/members/commission');return <Shell><PageTitle title="Commission" text="Three-level commissions are authoritative ledger credits."/>{loading?<p>Loading...</p>:<><div className="grid"><Card title="Total" value={`$${Number(data?.total??0).toFixed(2)}`}/><Card title="Level 1" value={`$${Number(data?.level1??0).toFixed(2)}`}/><Card title="Level 2" value={`$${Number(data?.level2??0).toFixed(2)}`}/><Card title="Level 3" value={`$${Number(data?.level3??0).toFixed(2)}`}/></div><List title="Commission history" rows={data?.history??[]} cols={['sourceReference','level','amount','createdAt']}/></>}</Shell>}
 function Account(){const {data}=useApi<any>('/members/summary');return <Shell><PageTitle title="Account" text="Identity, referral and security controls."/><section className="panel details">{data?.user&&Object.entries({Name:data.user.fullName,Username:data.user.username,Mobile:data.user.mobile,'Member ID':data.user.memberId,'Referral code':data.user.referralCode,Upliner:data.user.uplinerName??'-'}).map(([k,v])=><div className="row" key={k}><span>{k}</span><strong>{String(v)}</strong></div>)}</section><section className="panel actions"><Link to="/payment-details">Payment Details</Link><Link to="/security">Security</Link><Link to="/notifications">Notifications</Link></section></Shell>}
 function PaymentDetails(){
@@ -2975,7 +3122,11 @@ function AdminBanners(){
 }
 function assetUrl(value?:string){if(!value)return '';if(/^https?:/.test(value))return value;const base=(import.meta.env.VITE_API_URL??'/api').replace(/\/api$/,'');return `${base}${value}`;}
 function copy(value?:string){if(value)navigator.clipboard.writeText(value)}
-export default function App(){return <Routes><Route path="/login" element={<Auth/>}/><Route path="/register" element={<Auth/>}/><Route path="/forgot-password" element={<Forgot/>}/><Route path="/reset-password" element={<Reset/>}/><Route path="/" element={<Protected><Dashboard/></Protected>}/><Route path="/packages" element={<Protected><Packages/></Protected>}/><Route path="/deposit" element={<Protected><Deposit/></Protected>}/><Route path="/withdrawal" element={<Protected><Withdrawal/></Protected>}/><Route path="/team" element={<Protected><Team/></Protected>}/><Route path="/commission" element={<Protected><Commission/></Protected>}/><Route path="/account" element={<Protected><Account/></Protected>}/><Route path="/support" element={<Protected><Support/></Protected>}/><Route path="/payment-details" element={<Protected><PaymentDetails/></Protected>}/><Route path="/security" element={<Protected><Security/></Protected>}/><Route path="/transactions" element={<Protected><Transactions/></Protected>}/><Route path="/notifications" element={<Protected><Notifications/></Protected>}/><Route path="/capital" element={<Protected><Capital/></Protected>}/><Route path="/profit" element={<Protected><Profit/></Protected>}/><Route path="/rewards" element={<Protected><Rewards/></Protected>}/><Route path="/admin" element={<Protected admin><Admin/></Protected>}/><Route path="/admin/members" element={<Protected admin><AdminMembers/></Protected>}/><Route path="/admin/support" element={<Protected admin><AdminSupport/></Protected>}/><Route path="/admin/members/:id" element={<Protected admin><AdminMemberDetail/></Protected>}/><Route path="/admin/ledger" element={<Protected admin><AdminTable type="ledger"/></Protected>}/><Route path="/admin/audit" element={<Protected admin><AdminTable type="audit"/></Protected>}/><Route path="/admin/admins" element={<Protected superAdmin><AdminTable type="admins"/></Protected>}/><Route path="/admin/payment-requests" element={<Protected admin><AdminTable type="payment"/></Protected>}/><Route path="/admin/settings" element={<Protected admin><AdminSettings/></Protected>}/><Route path="/admin/finance" element={<Protected admin><AdminFinance/></Protected>}/><Route path="/admin/deposits" element={<Protected admin><AdminDeposits/></Protected>}/><Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals/></Protected>}/><Route path="/admin/packages" element={<Protected admin><AdminPackages/></Protected>}/><Route path="/admin/notifications" element={<Protected admin><AdminNotifications/></Protected>}/><Route path="/admin/banners" element={<Protected admin><AdminBanners/></Protected>}/></Routes>}
+export default function App(){return <Routes><Route path="/login" element={<Auth/>}/><Route path="/register" element={<Auth/>}/><Route path="/forgot-password" element={<Forgot/>}/><Route path="/reset-password" element={<Reset/>}/><Route path="/" element={<Protected><Dashboard/></Protected>}/><Route path="/packages" element={<Protected><Packages/></Protected>}/><Route path="/active-packages" element={<Protected><ActivePackages/></Protected>}/><Route path="/deposit" element={<Protected><Deposit/></Protected>}/><Route path="/withdrawal" element={<Protected><Withdrawal/></Protected>}/><Route path="/team" element={<Protected><Team/></Protected>}/><Route path="/commission" element={<Protected><Commission/></Protected>}/><Route path="/account" element={<Protected><Account/></Protected>}/><Route path="/support" element={<Protected><Support/></Protected>}/><Route path="/payment-details" element={<Protected><PaymentDetails/></Protected>}/><Route path="/security" element={<Protected><Security/></Protected>}/><Route path="/transactions" element={<Protected><Transactions/></Protected>}/><Route path="/notifications" element={<Protected><Notifications/></Protected>}/><Route path="/capital" element={<Protected><Capital/></Protected>}/><Route path="/profit" element={<Protected><Profit/></Protected>}/><Route path="/rewards" element={<Protected><Rewards/></Protected>}/><Route path="/admin" element={<Protected admin><Admin/></Protected>}/><Route path="/admin/members" element={<Protected admin><AdminMembers/></Protected>}/><Route path="/admin/support" element={<Protected admin><AdminSupport/></Protected>}/><Route path="/admin/members/:id" element={<Protected admin><AdminMemberDetail/></Protected>}/><Route path="/admin/ledger" element={<Protected admin><AdminTable type="ledger"/></Protected>}/><Route path="/admin/audit" element={<Protected admin><AdminTable type="audit"/></Protected>}/><Route path="/admin/admins" element={<Protected superAdmin><AdminTable type="admins"/></Protected>}/><Route path="/admin/payment-requests" element={<Protected admin><AdminTable type="payment"/></Protected>}/><Route path="/admin/settings" element={<Protected admin><AdminSettings/></Protected>}/><Route path="/admin/finance" element={<Protected admin><AdminFinance/></Protected>}/><Route path="/admin/deposits" element={<Protected admin><AdminDeposits/></Protected>}/><Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals/></Protected>}/><Route path="/admin/packages" element={<Protected admin><AdminPackages/></Protected>}/><Route path="/admin/notifications" element={<Protected admin><AdminNotifications/></Protected>}/><Route path="/admin/banners" element={<Protected admin><AdminBanners/></Protected>}/></Routes>}
+
+
+
+
 
 
 
