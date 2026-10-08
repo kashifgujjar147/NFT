@@ -38,7 +38,7 @@ export async function createWithdrawal(userId:any,input:any){
 
     const amount=money(Number(input.amount));
 
-    const minimum=settings?.minimumWithdrawal??0;
+    const minimum=Math.max(10,Number(settings?.minimumWithdrawal??10));
     const maximum=settings?.maximumWithdrawal??100000000;
 
     if(amount<minimum){
@@ -162,10 +162,10 @@ export async function createWithdrawal(userId:any,input:any){
       userId
     }).session(session);
 
-    if(!wallet||availableOf(wallet)<amount){
+    if(!wallet||Number(wallet.profit??0)<amount){
       throw new AppError(
         422,
-        'Insufficient available balance'
+        'Insufficient available profit balance'
       );
     }
 
@@ -331,12 +331,13 @@ export async function processWithdrawal(
        * We remove the reserved amount and deduct from the
        * actual balance fields in one transaction.
        */
+      /*
+       * Withdrawals are PROFIT-WALLET ONLY.
+       * Locked capital, deposit, commission and rewards must never
+       * be used to fund a withdrawal.
+       */
       const fields=[
-        'deposit',
-        'profit',
-        'commission',
-        'rewards',
-        'capitalAvailable'
+        'profit'
       ];
 
       let remaining=money(w.requestedAmount);
@@ -431,3 +432,4 @@ export async function processWithdrawal(
     return w;
   });
 }
+
