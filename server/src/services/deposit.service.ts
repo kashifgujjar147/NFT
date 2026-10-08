@@ -1,4 +1,4 @@
-﻿import crypto from 'node:crypto';
+import crypto from 'node:crypto';
 import {Deposit} from '../models/Deposit.js';
 import {PackagePurchase} from '../models/PackagePurchase.js';
 import {PackageModel} from '../models/Package.js';
@@ -7,6 +7,7 @@ import {createCapital} from './capital.service.js';
 import {AppError} from '../utils/errors.js';
 import {AuditLog} from '../models/AuditLog.js';
 import {AdminSettings} from '../models/AdminSettings.js';
+import {createCommissions} from './referral.service.js';
 
 function paymentMethodActive(settings:any,method:string){
   const pd:any=settings?.paymentDetails??{};
@@ -139,13 +140,12 @@ export async function approveDeposit(
     await d.save({session});
 
     /*
-     * Normal wallet deposit:
-     * approval credits the member wallet.
-     *
-     * Package deposit:
-     * payment was made externally, so we DO NOT credit wallet first
-     * and then debit it. Approval directly activates the package.
+     * Referral commission sirf admin approval ke baad banega.
+     * Commission isi MongoDB transaction ka hissa hoga.
      */
+    let commissionBusinessAmount = 0;
+    let commissionSourceReference = '';
+
     if(d.depositType==='package'){
       const purchase=await PackagePurchase.findOne({
         _id:d.packagePurchaseId,
@@ -237,6 +237,9 @@ export async function approveDeposit(
 
       await purchase.save({session});
 
+      commissionBusinessAmount = Number(purchase.totalAmount);
+      commissionSourceReference = `PACKAGE-${purchase._id}`;
+
       await AuditLog.create([{
         actorId:adminId,
         action:'package.activate',
@@ -272,6 +275,9 @@ export async function approveDeposit(
         adminActorId:adminId
       },{session});
 
+      commissionBusinessAmount = Number(d.amount);
+      commissionSourceReference = `DEPOSIT-${d._id}`;
+
       await AuditLog.create([{
         actorId:adminId,
         action:'deposit.approve',
@@ -287,6 +293,15 @@ export async function approveDeposit(
         ip:meta?.ip,
         userAgent:meta?.userAgent
       }],{session});
+    }
+
+    if (commissionBusinessAmount > 0 && commissionSourceReference) {
+      await createCommissions(
+        d.userId,
+        commissionBusinessAmount,
+        commissionSourceReference,
+        session
+      );
     }
 
     return d;
