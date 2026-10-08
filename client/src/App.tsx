@@ -65,19 +65,16 @@ function BannerCarousel({banners,loading}:{banners:any[];loading:boolean}){const
 function NotificationPopup({note}:{note:any}){const [open,setOpen]=useState(true);const [busy,setBusy]=useState(false);if(!open)return null;const close=async(dismiss:boolean)=>{setBusy(true);try{await api.post(`/content/notifications/${note._id}/${dismiss?'dismiss':'read'}`);setOpen(false)}catch{setOpen(false)}finally{setBusy(false)}};return <div className="modal-backdrop"><div className={`modal notification-modal notification-${note.type??'info'}`} style={{borderTopColor:note.color??'#D4AF37'}}><span className="eyebrow">{note.type??'NOTICE'}</span><h2>{note.title}</h2><p>{note.message}</p><div className="modal-actions"><button className="primary" disabled={busy} onClick={()=>close(!!note.dismissible)}>{busy?'Saving...':note.dismissible?'Dismiss':'Mark as read'}</button></div></div></div>}
 function Deposit(){
   const params=new URLSearchParams(location.search);
-  const requestedPackagePurchaseId=params.get('packagePurchaseId')??'';
-  const requestedPackageId=params.get('packageId')??'';
-  const requestedAmount=params.get('amount')??'';
+  const requestedPackageId=params.get('packagePurchaseId')??'';
 
   const [f,setF]=useState({
-    amount:requestedAmount,
+    amount:'',
     paymentMethod:'BEP20',
     reference:'',
     details:'',
     receipt:null as File|null,
     depositType:requestedPackageId?'package':'wallet',
-    packagePurchaseId:requestedPackagePurchaseId,
-    packageId:requestedPackageId
+    packagePurchaseId:requestedPackageId
   });
 
   const [msg,setMsg]=useState('');
@@ -86,7 +83,6 @@ function Deposit(){
   const {data,loading,error,reload}=useApi<any[]>('/deposits');
   const {data:settings,loading:settingsLoading}=useApi<any>('/content/settings');
   const {data:purchases}=useApi<any[]>('/packages/purchases');
-  const {data:packages}=useApi<any[]>('/packages');
 
   const bep20=settings?.paymentDetails?.bep20Active!==false;
   const bep20Address=String(settings?.paymentDetails?.bep20Address??'').trim();
@@ -95,30 +91,6 @@ function Deposit(){
   const pendingPackage=purchases?.find(
     (p:any)=>p._id===f.packagePurchaseId&&p.status==='pending'
   );
-  const selectedPackage=packages?.find(
-    (p:any)=>p._id===f.packageId
-  );
-
-  useEffect(()=>{
-    if(selectedPackage&&f.packageId&&!f.packagePurchaseId){
-      setF((x:any)=>({
-        ...x,
-        amount:String(
-          selectedPackage.salePrice??
-          selectedPackage.price??
-          ''
-        ),
-        depositType:'package',
-        paymentMethod:'BEP20'
-      }));
-    }
-  },[
-    selectedPackage?._id,
-    selectedPackage?.salePrice,
-    selectedPackage?.price,
-    f.packageId,
-    f.packagePurchaseId
-  ]);
 
   useEffect(()=>{
     if(pendingPackage){
@@ -174,57 +146,7 @@ function Deposit(){
         body.append('receipt',f.receipt);
       }
 
-      if(f.depositType==='package'&&f.packageId){
-        if(!f.receipt){
-          setMsg('NFT payment receipt upload karein.');
-          setBusy(false);
-          return;
-        }
-
-        const packageBody=new FormData();
-
-        packageBody.append(
-          'quantity',
-          '1'
-        );
-
-        packageBody.append(
-          'paymentMethod',
-          'BEP20'
-        );
-
-        packageBody.append(
-          'idempotencyKey',
-          crypto.randomUUID()
-        );
-
-        packageBody.append(
-          'amount',
-          f.amount
-        );
-
-        packageBody.append(
-          'reference',
-          f.reference
-        );
-
-        packageBody.append(
-          'details',
-          f.details
-        );
-
-        packageBody.append(
-          'receipt',
-          f.receipt
-        );
-
-        await api.post(
-          `/packages/${encodeURIComponent(f.packageId)}/purchase`,
-          packageBody
-        );
-      }else{
-        await api.post('/deposits',body);
-      }
+      await api.post('/deposits',body);
 
       setF({
         amount:'',
@@ -233,8 +155,7 @@ function Deposit(){
         details:'',
         receipt:null,
         depositType:'wallet',
-        packagePurchaseId:'',
-        packageId:''
+        packagePurchaseId:''
       });
 
       history.replaceState(null,'','/deposit');
@@ -339,6 +260,8 @@ function Deposit(){
             </button>
 
             <p className="muted">
+              Sirf isi network par payment bhejein. Wrong network/address
+              ki payment ko platform recover nahi kar sakta.
             </p>
           </div>
         </div>
@@ -370,6 +293,9 @@ function Deposit(){
         </div>
 
         <p>
+          Is exact amount ka BEP20 payment bhej kar neeche
+          transaction reference aur proof submit karein.
+          Admin approval ke baad hi NFT activate hoga.
         </p>
       </section>
     }
@@ -384,6 +310,8 @@ function Deposit(){
       </p>
 
       <small>
+        Deposit status initially Pending hota hai.
+        Funds/package sirf administrator verification ke baad approve/activate hoga.
       </small>
     </section>
 
@@ -565,6 +493,36 @@ function Deposit(){
   ]);
 
   const [msg,setMsg]=useState('');
+  const [cooldownLeft,setCooldownLeft]=useState(0);
+  const cooldownHours=Number(settings?.withdrawalCooldownHours??24);
+  const lastWithdrawal=(rows??[]).slice().sort((a:any,b:any)=>
+    new Date(b.requestedAt??b.createdAt??0).getTime()-
+    new Date(a.requestedAt??a.createdAt??0).getTime()
+  )[0];
+
+  useEffect(()=>{
+    const started=lastWithdrawal?.requestedAt??lastWithdrawal?.createdAt;
+    if(!started){setCooldownLeft(0);return;}
+
+    const update=()=>{
+      setCooldownLeft(Math.max(
+        0,
+        new Date(started).getTime()+cooldownHours*3600000-Date.now()
+      ));
+    };
+
+    update();
+    const timer=window.setInterval(update,1000);
+    return()=>window.clearInterval(timer);
+  },[lastWithdrawal?.requestedAt,lastWithdrawal?.createdAt,cooldownHours]);
+
+  const cooldownText=()=>{
+    const total=Math.ceil(cooldownLeft/1000);
+    const h=Math.floor(total/3600);
+    const m=Math.floor((total%3600)/60);
+    const sec=total%60;
+    return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
+  };
   const [busy,setBusy]=useState(false);
 
   const feePct=Number(
@@ -599,7 +557,7 @@ function Deposit(){
     e.preventDefault();
 
     if(isBep20&&f.paymentAccount.trim().length<10){
-      setMsg('Enter a valid BEP20 withdrawal address.');
+      setMsg('Valid BEP20 withdrawal address enter karein.');
       return;
     }
 
@@ -622,7 +580,9 @@ function Deposit(){
         paymentAccount:''
       });
 
-     
+      setMsg(
+        'Withdrawal Pending ho gaya hai. Admin verification/payment process ke baad hi complete hoga.'
+      );
     }catch(err:any){
       setMsg(
         err?.response?.data?.message??
@@ -678,6 +638,8 @@ function Deposit(){
         <span className="eyebrow">REQUEST WITHDRAWAL</span>
         <h2>Withdrawal details</h2>
         <p>
+          Requested amount mein se fixed admin fee deduct hogi.
+          Admin ko sirf net amount pay karna hoga.
         </p>
       </div>
 
@@ -733,7 +695,7 @@ function Deposit(){
           />
 
           <small className="muted">
-           
+            Admin isi address par net amount pay karega.
           </small>
         </section>
       }
@@ -859,7 +821,7 @@ function Deposit(){
 }:{
   p:any;
   onBack:()=>void;
-  onBuy:(id:string,amount:number)=>void;
+  onBuy:(id:string)=>void;
   busy:boolean
 }){
   const price=Number(
@@ -964,7 +926,9 @@ function Deposit(){
       </p>
 
       <div className="notice">
-
+        Purchase ke baad exact NFT price ka BEP20 payment
+        Pending verification ke liye create hoga.
+        Admin approval ke baad package activate hoga.
       </div>
 
       <button
@@ -973,7 +937,7 @@ function Deposit(){
           busy||
           Number(p.remainingQuantity??0)<=0
         }
-        onClick={()=>onBuy(p._id,price)}
+        onClick={()=>onBuy(p._id)}
       >
         {busy
           ?'Creating payment...'
@@ -988,21 +952,40 @@ function Deposit(){
 function Packages(){
   const {data,loading,error}=useApi<any[]>('/packages');
   const {data:purchases}=useApi<any[]>('/packages/purchases');
-  const {data:packages}=useApi<any[]>('/packages');
 
   const [msg,setMsg]=useState('');
   const [selected,setSelected]=useState<any>(null);
   const [buying,setBuying]=useState(false);
 
-  const buy=async(id:string,amount:number)=>{
+  const buy=async(id:string)=>{
     setBuying(true);
     setMsg('');
 
     try{
-      location.href=
-        `/deposit?packageId=&amount=${encodeURIComponent(id)}`;
-    }catch{
-      setMsg('Payment page open nahi ho saki');
+      const r=await api.post(
+        `/packages/${id}/purchase`,
+        {
+          quantity:1,
+          paymentMethod:'BEP20',
+          idempotencyKey:crypto.randomUUID()
+        }
+      );
+
+      const purchase=r.data?.data??r.data;
+
+      setMsg(
+        'NFT payment created. Ab exact amount BEP20 se pay karke proof submit karein.'
+      );
+
+      if(purchase?._id){
+        location.href=
+          `/deposit?packagePurchaseId=${encodeURIComponent(purchase._id)}`;
+      }
+    }catch(err:any){
+      setMsg(
+        err?.response?.data?.message??
+        'NFT purchase request failed'
+      );
     }finally{
       setBuying(false);
     }
@@ -1148,7 +1131,7 @@ function Packages(){
                     buying||
                     Number(p.remainingQuantity??0)<1
                   }
-                  onClick={()=>buy(p._id,Number(p.salePrice??p.price??0))}
+                  onClick={()=>buy(p._id)}
                 >
                   {buying
                     ?'Processing...'
@@ -1165,7 +1148,8 @@ function Packages(){
         <h2>Pending NFT Payments</h2>
 
         <p className="muted">
-         
+          In purchases ka exact payment abhi admin verification
+          ka wait kar raha hai.
         </p>
 
         <div className="list">
@@ -2449,6 +2433,8 @@ function AdminSettings(){
       <h2>Investment timing controls</h2>
 
       <p className="muted">
+        Yeh values future NFT/package defaults control karti hain.
+        Existing packages par unki saved settings apply hongi.
       </p>
 
       <div className="form-grid">
@@ -2536,6 +2522,8 @@ function AdminSettings(){
         />
 
         <p className="muted">
+          Member Deposit aur NFT payment screen par isi
+          address ka copy button aur QR show hoga.
         </p>
       </div>
 
@@ -2976,13 +2964,6 @@ function AdminBanners(){
 function assetUrl(value?:string){if(!value)return '';if(/^https?:/.test(value))return value;const base=(import.meta.env.VITE_API_URL??'/api').replace(/\/api$/,'');return `${base}${value}`;}
 function copy(value?:string){if(value)navigator.clipboard.writeText(value)}
 export default function App(){return <Routes><Route path="/login" element={<Auth/>}/><Route path="/register" element={<Auth/>}/><Route path="/forgot-password" element={<Forgot/>}/><Route path="/reset-password" element={<Reset/>}/><Route path="/" element={<Protected><Dashboard/></Protected>}/><Route path="/packages" element={<Protected><Packages/></Protected>}/><Route path="/deposit" element={<Protected><Deposit/></Protected>}/><Route path="/withdrawal" element={<Protected><Withdrawal/></Protected>}/><Route path="/team" element={<Protected><Team/></Protected>}/><Route path="/commission" element={<Protected><Commission/></Protected>}/><Route path="/account" element={<Protected><Account/></Protected>}/><Route path="/support" element={<Protected><Support/></Protected>}/><Route path="/payment-details" element={<Protected><PaymentDetails/></Protected>}/><Route path="/security" element={<Protected><Security/></Protected>}/><Route path="/transactions" element={<Protected><Transactions/></Protected>}/><Route path="/notifications" element={<Protected><Notifications/></Protected>}/><Route path="/capital" element={<Protected><Capital/></Protected>}/><Route path="/profit" element={<Protected><Profit/></Protected>}/><Route path="/rewards" element={<Protected><Rewards/></Protected>}/><Route path="/admin" element={<Protected admin><Admin/></Protected>}/><Route path="/admin/members" element={<Protected admin><AdminMembers/></Protected>}/><Route path="/admin/support" element={<Protected admin><AdminSupport/></Protected>}/><Route path="/admin/members/:id" element={<Protected admin><AdminMemberDetail/></Protected>}/><Route path="/admin/ledger" element={<Protected admin><AdminTable type="ledger"/></Protected>}/><Route path="/admin/audit" element={<Protected admin><AdminTable type="audit"/></Protected>}/><Route path="/admin/admins" element={<Protected superAdmin><AdminTable type="admins"/></Protected>}/><Route path="/admin/payment-requests" element={<Protected admin><AdminTable type="payment"/></Protected>}/><Route path="/admin/settings" element={<Protected admin><AdminSettings/></Protected>}/><Route path="/admin/finance" element={<Protected admin><AdminFinance/></Protected>}/><Route path="/admin/deposits" element={<Protected admin><AdminDeposits/></Protected>}/><Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals/></Protected>}/><Route path="/admin/packages" element={<Protected admin><AdminPackages/></Protected>}/><Route path="/admin/notifications" element={<Protected admin><AdminNotifications/></Protected>}/><Route path="/admin/banners" element={<Protected admin><AdminBanners/></Protected>}/></Routes>}
-
-
-
-
-
-
-
 
 
 
