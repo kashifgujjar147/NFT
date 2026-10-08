@@ -339,8 +339,6 @@ function Deposit(){
             </button>
 
             <p className="muted">
-              Only send payment on this network. Payment sent to the wrong network/address 
-              cannot be recovered by the platform.
             </p>
           </div>
         </div>
