@@ -10,7 +10,7 @@ export async function createCapital(userId:any,amount:number,sourceReference:str
     const exists=await CapitalLock.exists({sourceReference}).session(session);
     if(exists)throw new AppError(409,'Capital already created for this reference');
     const settings=await AdminSettings.findOne({key:'global'}).session(session);
-    const dailyProfitPercent=200;
+    const dailyProfitPercent=Number(settings?.dailyProfitPercent??1);
     const createdAt=new Date();
     const nextProfitAt=new Date(createdAt.getTime()+86400000);
     const c=(await CapitalLock.create([{userId,amount:money(amount),createdAt,unlockAt:new Date('2099-12-31T23:59:59.999Z'),dailyProfitPercent,nextProfitAt,status:'locked',sourceReference}],{session}))[0];
@@ -29,7 +29,7 @@ export async function accrueDueCapitalProfits(){
       const c=await CapitalLock.findOne({_id:item._id,status:'locked',nextProfitAt:{$lte:now},dailyProfitPercent:{$gt:0}}).session(session);
       if(!c)return;
       const cycleAt=new Date(c.nextProfitAt);
-      const profit=money(Number(c.amount)*200/100);
+      const profit=money(Number(c.amount)*Number(c.dailyProfitPercent)/100);
       if(profit>0)await ledgerEntry({userId:c.userId,type:'profit',amount:profit,direction:'credit',reference:`CAP-PROFIT-${c._id}-${cycleAt.getTime()}`,description:`Daily capital profit (${Number(c.dailyProfitPercent)}%)`,relatedEntity:c._id},{session});
       c.totalProfitAccrued=money(Number(c.totalProfitAccrued??0)+profit);
       c.lastProfitAt=cycleAt;
