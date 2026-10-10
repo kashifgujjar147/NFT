@@ -1,4 +1,4 @@
-﻿import {useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {ReactNode,FormEvent} from 'react';
 import {Link,Routes,Route,useNavigate,useParams, NavLink} from 'react-router-dom';
 import {api,setAccessToken,getAccessToken} from './lib/api';
@@ -55,7 +55,7 @@ function Shell({children,title='NEXUS MEMBER'}:{children:ReactNode;title?:string
       </div>
     </header>
     <main className="content">{children}</main>
-    <nav className="bottom"><NavLink to="/" end><span className="nav-icon"><House size={22}/></span><span>Home</span></NavLink><NavLink to="/packages"><span className="nav-icon"><Gem size={22}/></span><span>NFT</span></NavLink><NavLink to="/active-packages"><span className="nav-icon"><Package size={22}/></span><span>Packages</span></NavLink><NavLink to="/deposit"><span className="nav-icon"><WalletCards size={22}/></span><span>Deposit</span></NavLink><NavLink to="/withdrawal"><span className="nav-icon"><ArrowUpRight size={22}/></span><span>Withdraw</span></NavLink><NavLink to="/support"><span className="nav-icon"><MessageCircle size={22}/></span><span>Support</span></NavLink><NavLink to="/account"><span className="nav-icon"><UserRound size={22}/></span><span>Account</span></NavLink></nav>
+    <nav className="bottom"><NavLink to="/" end><span className="nav-icon"><House size={22}/></span><span>Home</span></NavLink><NavLink to="/packages"><span className="nav-icon"><Gem size={22}/></span><span>NFT</span></NavLink><NavLink to="/active-packages"><span className="nav-icon"><Package size={22}/></span><span>Packages</span></NavLink><NavLink to="/withdrawal"><span className="nav-icon"><ArrowUpRight size={22}/></span><span>Withdraw</span></NavLink><NavLink to="/support"><span className="nav-icon"><MessageCircle size={22}/></span><span>Support</span></NavLink><NavLink to="/account"><span className="nav-icon"><UserRound size={22}/></span><span>Account</span></NavLink></nav>
   </div>
 }
 function Auth(){const n=useNavigate();const [mode,setMode]=useState<'login'|'register'>('login');const referralFromUrl=new URLSearchParams(location.search).get('ref')?.trim()??'';const [form,setForm]=useState({username:'',password:'',fullName:'',mobile:'',email:'',referralCode:mode==='register'?referralFromUrl:'',jazzCash:'',easypaisa:''});useEffect(()=>{if(mode==='register'&&referralFromUrl)setForm(f=>({...f,referralCode:referralFromUrl.toUpperCase()}));},[mode,referralFromUrl]);const [error,setError]=useState('');const submit=async(e:FormEvent)=>{e.preventDefault();setError('');try{const body=mode==='login'?{username:form.username,password:form.password}:{...form,paymentDetails:{jazzCash:form.jazzCash,easypaisa:form.easypaisa}};const r=await api.post(mode==='login'?'/auth/login':'/auth/register',body);setAccessToken(r.data.data.accessToken);localStorage.setItem('member',JSON.stringify(r.data.data.user));localStorage.setItem('showWhatsappJoinPrompt','1');n('/');}catch(err:any){setError(err?.response?.data?.message??'Request failed')}};return <main className="auth"><div className="auth-card"><div className="brand">NEXUS<span>MEMBER</span></div><h1>{mode==='login'?'Welcome back':'Create your account'}</h1><p className="muted">Secure member workspace with server-authoritative financial data.</p>{error&&<div className="alert">{error}</div>}<form onSubmit={submit}>{mode==='register'&&<><input required placeholder="Full name" value={form.fullName} onChange={e=>setForm({...form,fullName:e.target.value})}/><input required placeholder="Mobile number" value={form.mobile} onChange={e=>setForm({...form,mobile:e.target.value})}/><input required type="email" placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/><input placeholder="Referral code" value={form.referralCode} readOnly={Boolean(referralFromUrl)} onChange={e=>setForm({...form,referralCode:e.target.value.toUpperCase()})}/></>}<input required placeholder="Username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})}/><input required type="password" minLength={10} placeholder="Password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><button className="primary">{mode==='login'?'Sign in':'Register'}</button></form>{mode==='login'&&<Link className="back-link" to="/forgot-password">Forgot password?</Link>}<button className="link-btn" onClick={()=>setMode(mode==='login'?'register':'login')}>{mode==='login'?'Create a new account':'Already have an account?'}</button></div></main>}
@@ -450,7 +450,7 @@ setBusy(true);
           value={f.paymentMethod}
           onChange={e=>setF({...f,paymentMethod:e.target.value})}
         >
-          <option value="WALLET">Pay with Wallet</option>
+          
           <option value="BEP20">BEP20</option>
         </select>
       </label>
@@ -995,7 +995,7 @@ setBusy(true);
 
       </div>
 
-      <button
+      {false && (<button
         className="primary"
         disabled={
           busy||
@@ -1008,7 +1008,7 @@ setBusy(true);
           :Number(p.remainingQuantity??0)<=0
             ?'Sold Out'
             :'Buy NFT with Wallet Balance'}
-      </button>
+      </button>)}
     </section>
   </Shell>
 }
