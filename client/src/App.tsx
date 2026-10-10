@@ -1178,7 +1178,7 @@ function Packages(){
                 >
                   {buying
                     ?'Processing...'
-                    :'Buy with Wallet Balance'}
+                    :'Buy Package'}
                 </button>
               </div>
             </article>
@@ -3125,6 +3125,7 @@ function AdminBanners(){
 function assetUrl(value?:string){if(!value)return '';if(/^https?:/.test(value))return value;const base=(import.meta.env.VITE_API_URL??'/api').replace(/\/api$/,'');return `${base}${value}`;}
 function copy(value?:string){if(value)navigator.clipboard.writeText(value)}
 export default function App(){return <Routes><Route path="/login" element={<Auth/>}/><Route path="/register" element={<Auth/>}/><Route path="/forgot-password" element={<Forgot/>}/><Route path="/reset-password" element={<Reset/>}/><Route path="/" element={<Protected><Dashboard/></Protected>}/><Route path="/packages" element={<Protected><Packages/></Protected>}/><Route path="/active-packages" element={<Protected><ActivePackages/></Protected>}/><Route path="/deposit" element={<Protected><Deposit/></Protected>}/><Route path="/withdrawal" element={<Protected><Withdrawal/></Protected>}/><Route path="/team" element={<Protected><Team/></Protected>}/><Route path="/commission" element={<Protected><Commission/></Protected>}/><Route path="/account" element={<Protected><Account/></Protected>}/><Route path="/support" element={<Protected><Support/></Protected>}/><Route path="/payment-details" element={<Protected><PaymentDetails/></Protected>}/><Route path="/security" element={<Protected><Security/></Protected>}/><Route path="/transactions" element={<Protected><Transactions/></Protected>}/><Route path="/notifications" element={<Protected><Notifications/></Protected>}/><Route path="/capital" element={<Protected><Capital/></Protected>}/><Route path="/profit" element={<Protected><Profit/></Protected>}/><Route path="/rewards" element={<Protected><Rewards/></Protected>}/><Route path="/admin" element={<Protected admin><Admin/></Protected>}/><Route path="/admin/members" element={<Protected admin><AdminMembers/></Protected>}/><Route path="/admin/support" element={<Protected admin><AdminSupport/></Protected>}/><Route path="/admin/members/:id" element={<Protected admin><AdminMemberDetail/></Protected>}/><Route path="/admin/ledger" element={<Protected admin><AdminTable type="ledger"/></Protected>}/><Route path="/admin/audit" element={<Protected admin><AdminTable type="audit"/></Protected>}/><Route path="/admin/admins" element={<Protected superAdmin><AdminTable type="admins"/></Protected>}/><Route path="/admin/payment-requests" element={<Protected admin><AdminTable type="payment"/></Protected>}/><Route path="/admin/settings" element={<Protected admin><AdminSettings/></Protected>}/><Route path="/admin/finance" element={<Protected admin><AdminFinance/></Protected>}/><Route path="/admin/deposits" element={<Protected admin><AdminDeposits/></Protected>}/><Route path="/admin/withdrawals" element={<Protected admin><AdminWithdrawals/></Protected>}/><Route path="/admin/packages" element={<Protected admin><AdminPackages/></Protected>}/><Route path="/admin/notifications" element={<Protected admin><AdminNotifications/></Protected>}/><Route path="/admin/banners" element={<Protected admin><AdminBanners/></Protected>}/></Routes>}
+
 
 
 
