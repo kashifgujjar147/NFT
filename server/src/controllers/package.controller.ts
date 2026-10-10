@@ -1,10 +1,9 @@
-import {purchasePackageFromWallet} from '../services/package.service.js';
+﻿import {purchasePackageFromWallet} from '../services/package.service.js';
 import {Request,Response} from 'express';
 import {audit} from '../services/audit.service.js'; import {ok} from '../utils/api.js'; import {PackageModel} from '../models/Package.js'; import {PackagePurchase} from '../models/PackagePurchase.js'; import {purchasePackage} from '../services/package.service.js'; import {AppError} from '../utils/errors.js';
 export async function listPackagesController(_req:Request,res:Response){return ok(res,await import('../services/package.service.js').then(x=>x.listPackages()));}
 export async function purchaseWalletController(req: Request, res: Response) {
-  const user = (req as any).user;
-  const userId = user?.id ?? user?._id;
+  const userId = req.auth?.userId;
   if (!userId) throw new AppError(401, 'Authentication required');
   const {quantity, idempotencyKey} = req.body;
   const purchase = await purchasePackageFromWallet(userId, String(req.params.id), Number(quantity), String(idempotencyKey));
@@ -92,6 +91,7 @@ export async function adminCreatePackage(req:Request,res:Response){const p=await
 export async function adminUpdatePackage(req:Request,res:Response){const before=await PackageModel.findById(String(req.params.id)).lean();if(!before)throw new AppError(404,'Package not found');if(req.body.quantity!=null && req.body.quantity<before.quantity-before.remainingQuantity)throw new AppError(422,'Quantity cannot be below units already sold');const p=await PackageModel.findByIdAndUpdate(String(req.params.id),{$set:req.body},{new:true,runValidators:true});if(!p)throw new AppError(404,'Package not found');if(req.body.quantity!=null && req.body.remainingQuantity==null){p.remainingQuantity=req.body.quantity-(before.quantity-before.remainingQuantity);await p.save();}await audit({actorId:req.auth!.userId,action:'package.update',targetType:'Package',targetId:p._id.toString(),before,after:p.toObject()});return ok(res,p,'Package updated');}
 export async function adminPackageStatus(req:Request,res:Response){const active=req.body?.active;if(typeof active!=='boolean')throw new AppError(400,'active must be boolean');const before=await PackageModel.findById(String(req.params.id)).lean();if(!before)throw new AppError(404,'Package not found');const p=await PackageModel.findByIdAndUpdate(String(req.params.id),{$set:{active}},{new:true});await audit({actorId:req.auth!.userId,action:'package.status',targetType:'Package',targetId:p!._id.toString(),before,after:p!.toObject()});return ok(res,p,'Package status updated');}
 export async function adminPackageInventory(req:Request,res:Response){const quantity=Number(req.body?.quantity);if(!Number.isInteger(quantity)||quantity<0)throw new AppError(400,'Quantity must be a non-negative integer');const p=await PackageModel.findById(String(req.params.id));if(!p)throw new AppError(404,'Package not found');const sold=p.quantity-p.remainingQuantity;if(quantity<sold)throw new AppError(422,'Quantity cannot be below units already sold');const before=p.toObject();p.quantity=quantity;p.remainingQuantity=quantity-sold;await p.save();await audit({actorId:req.auth!.userId,action:'package.inventory',targetType:'Package',targetId:p._id.toString(),before,after:p.toObject()});return ok(res,p,'Inventory updated');}
+
 
 
 
