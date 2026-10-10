@@ -1,4 +1,4 @@
-﻿import {useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {ReactNode,FormEvent} from 'react';
 import {Link,Routes,Route,useNavigate,useParams, NavLink} from 'react-router-dom';
 import {api,setAccessToken,getAccessToken} from './lib/api';
@@ -1347,27 +1347,8 @@ function Packages(){
                       <strong>${Number(p.totalAmount??0).toFixed(2)}</strong>
                     </span>
                     <span>
-                      Capital recovery<br/>
-                      {p.capitalRecoveryAt
-                        ?new Date(p.capitalRecoveryAt).toLocaleString()
-                        :'-'}
-                    </span>
-                    <span>
-                      Profit starts<br/>
-                      {p.profitStartsAt
-                        ?new Date(p.profitStartsAt).toLocaleString()
-                        :'-'}
-                    </span>
-                    <span>
-                      Matures<br/>
-                      {p.maturesAt
-                        ?new Date(p.maturesAt).toLocaleString()
-                        :'-'}
-                    </span>
-                    <span>
-                      Profit ${Number(p.profitAmount??0).toFixed(2)}
-                      <br/>
-                      Payout ${Number(p.payoutAmount??0).toFixed(2)}
+                      Profit Earned<br/>
+                      <strong>${Number(p.profitAmount??0).toFixed(2)}</strong>
                     </span>
                     <strong>{p.status}</strong>
                   </div>
