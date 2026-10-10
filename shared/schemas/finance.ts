@@ -3,6 +3,10 @@ const safeHttpUrl=z.string().trim().url().refine(v=>/^https?:\/\//i.test(v),'Onl
 const safeWhatsApp=z.union([safeHttpUrl,z.string().trim().regex(/^\+?[0-9 ()-]{7,25}$/),z.literal('')]).transform(v=>!v?'':/^https?:\/\//i.test(v)?v:`https://wa.me/${v.replace(/\D/g,'')}`);
 export const depositCreateSchema=z.object({amount:z.coerce.number().positive().max(100000000),paymentMethod:z.enum(['JazzCash','Easypaisa','BEP20']),reference:z.string().trim().min(3).max(120),details:z.string().trim().max(1000).optional(),depositType:z.enum(['wallet','package']).default('wallet'),packagePurchaseId:z.string().trim().optional()}).superRefine((v,ctx)=>{if(v.depositType==='package'&&!v.packagePurchaseId)ctx.addIssue({code:'custom',message:'Package purchase is required',path:['packagePurchaseId']});});
 export const withdrawalCreateSchema=z.object({amount:z.coerce.number().positive().max(100000000),paymentMethod:z.enum(['JazzCash','Easypaisa','BEP20']),paymentAccount:z.string().trim().min(10).max(120).optional(),idempotencyKey:z.string().trim().min(16).max(128)});
+export const walletPackagePurchaseSchema = z.object({
+  quantity: z.coerce.number().int().min(1).max(100),
+  idempotencyKey: z.string().trim().min(16).max(128)
+});
 export const packagePurchaseSchema=z.object({
   quantity:z.coerce.number().int().min(1).max(100),
   paymentMethod:z.enum(['BEP20']).default('BEP20'),

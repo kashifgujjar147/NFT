@@ -977,7 +977,7 @@ setBusy(true);
           ?'Creating payment...'
           :Number(p.remainingQuantity??0)<=0
             ?'Sold Out'
-            :'Buy NFT & Pay by BEP20'}
+            :'Buy NFT with Wallet Balance'}
       </button>
     </section>
   </Shell>
@@ -992,15 +992,18 @@ function Packages(){
   const [selected,setSelected]=useState<any>(null);
   const [buying,setBuying]=useState(false);
 
-  const buy=async(id:string,amount:number)=>{
+  const buy=async(id:string,_amount:number)=>{
     setBuying(true);
     setMsg('');
-
     try{
-      location.href=
-        `/deposit?packageId=${encodeURIComponent(id)}&amount=${encodeURIComponent(amount)}`;
-    }catch{
-      setMsg('Payment page open nahi ho saki');
+      const idempotencyKey=`wallet-${id}-${crypto.randomUUID()}`;
+      await api.post(`/packages/${encodeURIComponent(id)}/purchase-wallet`,{quantity:1,idempotencyKey});
+      setMsg('NFT package purchased and activated successfully.');
+      setSelected(null);
+      // Refresh the visible package and purchase lists after the transaction.
+      window.location.reload();
+    }catch(err:any){
+      setMsg(err?.response?.data?.message??'NFT package purchase failed');
     }finally{
       setBuying(false);
     }
@@ -1042,7 +1045,7 @@ function Packages(){
   return <Shell>
     <PageTitle
       title="NFT / Packages"
-      text="Buy an NFT package by exact BEP20 payment and wait for admin verification."
+      text="Buy an NFT package instantly using your wallet deposit balance."
     />
 
     {msg&&
@@ -1150,7 +1153,7 @@ function Packages(){
                 >
                   {buying
                     ?'Processing...'
-                    :'Buy & Pay BEP20'}
+                    :'Buy with Wallet Balance'}
                 </button>
               </div>
             </article>

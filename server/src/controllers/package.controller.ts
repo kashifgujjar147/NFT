@@ -1,6 +1,15 @@
+import {purchasePackageFromWallet} from '../services/package.service.js';
 import {Request,Response} from 'express';
 import {audit} from '../services/audit.service.js'; import {ok} from '../utils/api.js'; import {PackageModel} from '../models/Package.js'; import {PackagePurchase} from '../models/PackagePurchase.js'; import {purchasePackage} from '../services/package.service.js'; import {AppError} from '../utils/errors.js';
 export async function listPackagesController(_req:Request,res:Response){return ok(res,await import('../services/package.service.js').then(x=>x.listPackages()));}
+export async function purchaseWalletController(req: Request, res: Response) {
+  const user = (req as any).user;
+  const userId = user?.id ?? user?._id;
+  if (!userId) throw new AppError(401, 'Authentication required');
+  const {quantity, idempotencyKey} = req.body;
+  const purchase = await purchasePackageFromWallet(userId, String(req.params.id), Number(quantity), String(idempotencyKey));
+  return ok(res, purchase);
+}
 export async function purchasesController(req:Request,res:Response){
   const userId=req.auth!.userId;
   const purchases=await PackagePurchase.find({userId})

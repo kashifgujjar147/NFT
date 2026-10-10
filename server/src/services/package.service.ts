@@ -1,4 +1,8 @@
-﻿import mongoose from 'mongoose';
+import {ensureWallet} from './ledger.service.js';
+import {createCommissions} from './referral.service.js';
+import {Transaction} from '../models/Transaction.js';
+import {Wallet} from '../models/Wallet.js';
+import mongoose from 'mongoose';
 import {PackageModel} from '../models/Package.js';
 import {PackagePurchase} from '../models/PackagePurchase.js';
 import {Deposit} from '../models/Deposit.js';
@@ -256,6 +260,115 @@ export async function purchasePackage(
     purchase.paymentDepositId=deposit._id;
 
     await purchase.save({session});
+
+    return purchase;
+  });
+}
+export async function purchasePackageFromWallet(
+  userId: any,
+  packageId: string,
+  quantity: number,
+  idempotencyKey: string
+) {
+  return withTransaction(async session => {
+    const existing = await PackagePurchase.findOne({userId, idempotencyKey}).session(session);
+    if (existing) return existing;
+
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+      throw new AppError(422, 'Invalid package quantity');
+    }
+    if (!idempotencyKey || idempotencyKey.length < 16 || idempotencyKey.length > 128) {
+      throw new AppError(422, 'Invalid idempotency key');
+    }
+
+    const now = new Date();
+    const p = await PackageModel.findOne({_id: packageId, active: true}).session(session);
+    if (!p) throw new AppError(404, 'Package not found or inactive');
+    if (p.startDate && now < new Date(p.startDate)) throw new AppError(409, 'Package sale has not started');
+    if (p.endDate && now > new Date(p.endDate)) throw new AppError(409, 'Package sale has ended');
+
+    const settings = await AdminSettings.findOne({key: 'global'}).session(session);
+    const unitPrice = money(p.salePrice ?? p.price);
+    const total = money(unitPrice * quantity);
+    if (!Number.isFinite(total) || total <= 0) throw new AppError(422, 'Invalid package price');
+
+    const recoveryDays = Math.max(0, Number(p.capitalRecoveryDays ?? settings?.capitalRecoveryDays ?? 45));
+    const profitDays = Math.max(0, Number(p.profitDurationDays ?? settings?.profitDurationDays ?? 45));
+    const configuredDays = Math.max(1, Number(p.investmentDays ?? settings?.totalInvestmentDays ?? recoveryDays + profitDays));
+    const investmentDays = Math.max(configuredDays, recoveryDays + profitDays);
+    const profitPercent = Number(p.profitPercent ?? 0);
+    const profitAmount = money(total * profitPercent / 100);
+    const payoutAmount = money(total + profitAmount);
+    const dailyProfitAmount = money(total * profitPercent / 100);
+
+    // Ensure the wallet exists, then debit ONLY wallet.deposit. This is inside
+    // the same transaction as inventory reservation and purchase creation.
+    await ensureWallet(userId, session);
+    const wallet = await Wallet.findOneAndUpdate(
+      {userId, deposit: {$gte: total}},
+      {$inc: {deposit: -total, version: 1}},
+      {new: true, session}
+    );
+    if (!wallet) throw new AppError(422, 'Insufficient wallet deposit balance');
+
+    const updatedPackage = await PackageModel.findOneAndUpdate(
+      {_id: p._id, active: true, remainingQuantity: {$gte: quantity}},
+      {$inc: {remainingQuantity: -quantity}},
+      {new: true, session}
+    );
+    if (!updatedPackage) throw new AppError(409, 'Insufficient package availability');
+
+    const purchaseReference = generateReference('PUR');
+    const purchase = (await PackagePurchase.create([{
+      userId,
+      packageId: p._id,
+      quantity,
+      unitPrice,
+      totalAmount: total,
+      reference: purchaseReference,
+      idempotencyKey,
+      status: 'active',
+      purchasedAt: now,
+      activatedAt: now,
+      capitalRecoveryDays: recoveryDays,
+      profitDurationDays: profitDays,
+      investmentDays,
+      capitalRecoveryAt: null,
+      profitStartsAt: null,
+      maturesAt: new Date(now.getTime() + investmentDays * 86400000),
+      profitPercent,
+      dailyProfitAmount,
+      profitAmount,
+      payoutAmount,
+      lastProfitAt: null,
+      nextProfitAt: new Date(now.getTime() + 86400000),
+      profitCyclesCredited: 0,
+      paymentDepositId: null
+    }], {session}))[0];
+
+    const transactionReference = `PKG-WALLET-${purchase._id}`;
+    await Transaction.create([{
+      transactionId: generateReference('TXN'),
+      userId,
+      type: 'package_purchase',
+      amount: total,
+      direction: 'debit',
+      status: 'completed',
+      reference: transactionReference,
+      description: 'NFT package purchased using deposit balance',
+      relatedEntity: purchase._id,
+      metadata: {packageId: String(p._id), quantity, unitPrice, paymentMethod: 'WALLET_DEPOSIT'}
+    }], {session});
+
+    await createCommissions(userId, total, `PACKAGE-${purchase._id}`, session);
+    await audit({
+      actorId: userId,
+      action: 'package.purchase.wallet',
+      targetType: 'PackagePurchase',
+      targetId: String(purchase._id),
+      after: {status: purchase.status, totalAmount: total, packageId: String(p._id), activatedAt: purchase.activatedAt, nextProfitAt: purchase.nextProfitAt},
+      metadata: {paymentMethod: 'WALLET_DEPOSIT', transactionReference}
+    }, {session});
 
     return purchase;
   });
