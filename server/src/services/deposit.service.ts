@@ -1,6 +1,7 @@
-import crypto from 'node:crypto';
+﻿import crypto from 'node:crypto';
 import {Deposit} from '../models/Deposit.js';
 import {PackagePurchase} from '../models/PackagePurchase.js';
+import {Transaction} from '../models/Transaction.js';
 import {PackageModel} from '../models/Package.js';
 import {ledgerEntry,withTransaction} from './ledger.service.js';
 import {createCapital} from './capital.service.js';
@@ -234,8 +235,22 @@ export async function approveDeposit(
 
       purchase.profitAmount=0;
       purchase.payoutAmount=0;
-
       await purchase.save({session});
+
+      const capitalReference = `PKG-CAPITAL-${purchase._id}`;
+      const existingCapitalEntry = await Transaction.exists({reference:capitalReference}).session(session);
+      if (!existingCapitalEntry) {
+        await ledgerEntry({
+          userId:d.userId,
+          type:'capital',
+          amount:Number(purchase.totalAmount),
+          direction:'credit',
+          reference:capitalReference,
+          description:'Approved package purchase added to Capital Locked',
+          relatedEntity:purchase._id,
+          adminActorId:adminId
+        },{session});
+      }
 
       commissionBusinessAmount = Number(purchase.totalAmount);
       commissionSourceReference = `PACKAGE-${purchase._id}`;
@@ -369,6 +384,7 @@ export async function rejectDeposit(
 export function generateReference(prefix:string){
   return `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
+
 
 
 
