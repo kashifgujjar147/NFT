@@ -1,7 +1,50 @@
-﻿import {Request,Response} from 'express';
+import {Request,Response} from 'express';
 import {audit} from '../services/audit.service.js'; import {ok} from '../utils/api.js'; import {PackageModel} from '../models/Package.js'; import {PackagePurchase} from '../models/PackagePurchase.js'; import {purchasePackage} from '../services/package.service.js'; import {AppError} from '../utils/errors.js';
 export async function listPackagesController(_req:Request,res:Response){return ok(res,await import('../services/package.service.js').then(x=>x.listPackages()));}
-export async function purchasesController(req:Request,res:Response){return ok(res,await PackagePurchase.find({userId:req.auth!.userId}).populate('packageId').sort({createdAt:-1}).lean());}
+export async function purchasesController(req:Request,res:Response){
+  const userId=req.auth!.userId;
+  const purchases=await PackagePurchase.find({userId})
+    .populate('packageId')
+    .sort({createdAt:-1})
+    .lean();
+
+  const {Transaction}=await import('../models/Transaction.js');
+  const {Types}=await import('mongoose');
+  const userObjectId=new Types.ObjectId(String(userId));
+  const purchaseIds=purchases.map((p:any)=>p._id);
+
+  const profitRows=await Transaction.aggregate([
+    {
+      $match:{
+        userId:userObjectId,
+        type:'profit',
+        direction:'credit',
+        status:'completed',
+        relatedEntity:{$in:purchaseIds}
+      }
+    },
+    {
+      $group:{
+        _id:'$relatedEntity',
+        earnedProfit:{$sum:'$amount'}
+      }
+    }
+  ]);
+
+  const profitByPurchase=new Map(
+    profitRows.map((row:any)=>[
+      String(row._id),
+      Number(row.earnedProfit??0)
+    ])
+  );
+
+  const result=purchases.map((p:any)=>({
+    ...p,
+    earnedProfit:Number(profitByPurchase.get(String(p._id))??0)
+  }));
+
+  return ok(res,result);
+}
 export async function purchaseController(req:Request,res:Response){
   const receiptPath=req.file?.filename??null;
 

@@ -1348,7 +1348,7 @@ function Packages(){
                     </span>
                     <span>
                       Profit Earned<br/>
-                      <strong>${Number(p.profitAmount??0).toFixed(2)}</strong>
+                      <strong>${Number(p.earnedProfit??0).toFixed(2)}</strong>
                     </span>
                     <strong>{p.status}</strong>
                   </div>
