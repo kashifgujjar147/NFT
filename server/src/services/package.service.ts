@@ -1,4 +1,4 @@
-import {ensureWallet} from './ledger.service.js';
+﻿import {ensureWallet} from './ledger.service.js';
 import {createCommissions} from './referral.service.js';
 import {Transaction} from '../models/Transaction.js';
 import {Wallet} from '../models/Wallet.js';
@@ -360,7 +360,6 @@ export async function purchasePackageFromWallet(
       metadata: {packageId: String(p._id), quantity, unitPrice, paymentMethod: 'WALLET_DEPOSIT'}
     }], {session});
 
-    await createCommissions(userId, total, `PACKAGE-${purchase._id}`, session);
     await audit({
       actorId: userId,
       action: 'package.purchase.wallet',
