@@ -162,7 +162,7 @@ export async function createWithdrawal(userId:any,input:any){
       userId
     }).session(session);
 
-    if(!wallet||Number(wallet.profit??0)<amount){
+    if(!wallet||availableOf(wallet as any)<amount){
       throw new AppError(
         422,
         'Insufficient available profit balance'
@@ -336,9 +336,7 @@ export async function processWithdrawal(
        * Locked capital, deposit, commission and rewards must never
        * be used to fund a withdrawal.
        */
-      const fields=[
-        'profit'
-      ];
+      const fields=['profit','commission','rewards','capitalAvailable'];
 
       let remaining=money(w.requestedAmount);
 
@@ -432,4 +430,5 @@ export async function processWithdrawal(
     return w;
   });
 }
+
 
