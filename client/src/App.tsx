@@ -1,4 +1,4 @@
-﻿import {useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {ReactNode,FormEvent} from 'react';
 import {Link,Routes,Route,useNavigate,useParams, NavLink} from 'react-router-dom';
 import {api,setAccessToken,getAccessToken} from './lib/api';
@@ -1128,58 +1128,7 @@ function Packages(){
                 </strong>
               </div>
 
-              <div className="muted">
-                Capital recovery:{' '}
-                {Number(p.capitalRecoveryDays??45)} days
-                {' Ã‚Â· '}
-                Profit phase:{' '}
-                {Number(p.profitDurationDays??45)} days
-                {' Ã‚Â· '}
-                Total:{' '}
-                {Number(p.investmentDays??90)} days
-              </div>
-
-              <div>
-                Profit:{' '}
-                <strong>
-                  {Number(p.profitPercent??0)}%
-                </strong>
-              </div>
-
-              <div>
-                Expected payout:{' '}
-                <strong>
-                  ${(Number(p.salePrice??p.price)*
-                    (1+Number(p.profitPercent??0)/100)
-                  ).toFixed(2)}
-                </strong>
-              </div>
-
-              {p.endDate&&
-                <Countdown end={p.endDate}/>
-              }
-
-              <div className="actions">
-                <button
-                  type="button"
-                  onClick={()=>setSelected(p)}
-                >
-                  View NFT
-                </button>
-
-                <button
-                  className="primary"
-                  disabled={
-                    buying||
-                    Number(p.remainingQuantity??0)<1
-                  }
-                  onClick={()=>buy(p._id,Number(p.salePrice??p.price??0))}
-                >
-                  {buying
-                    ?'Processing...'
-                    :'Buy Package'}
-                </button>
-              </div>
+              
             </article>
           )}
         </div>
