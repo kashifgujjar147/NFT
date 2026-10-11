@@ -1,4 +1,4 @@
-﻿import {useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {ReactNode,FormEvent} from 'react';
 import {Link,Routes,Route,useNavigate,useParams, NavLink} from 'react-router-dom';
 import {api,setAccessToken,getAccessToken} from './lib/api';
@@ -949,41 +949,12 @@ setBusy(true);
       <h2>{p.name}</h2>
       <p>{p.description??'NFT investment package'}</p>
 
-      <div className="grid">
-        <Card
+            <div className="grid">
+<Card
           title="Exact price"
           value={`${price.toFixed(2)}`}
         />
-
-        <Card
-          title="Capital recovery"
-          value={`${recoveryDays} days`}
-        />
-
-        <Card
-          title="Profit phase"
-          value={`${profitDays} days`}
-        />
-
-        <Card
-          title="Total duration"
-          value={`${days} days`}
-        />
-
-        <Card
-          title="Profit"
-          value={`${profitPct.toFixed(2)}%`}
-        />
-
-        <Card
-          title="Expected profit"
-          value={`${profit.toFixed(2)}`}
-        />
-
-        <Card
-          title="Expected payout"
-          value={`${payout.toFixed(2)}`}
-        />
+      </div>
       </div>
 
       <p>
@@ -1128,32 +1099,7 @@ function Packages(){
                 </strong>
               </div>
 
-              <div className="muted">
-                Capital recovery:{' '}
-                {Number(p.capitalRecoveryDays??45)} days
-                {' Ã‚Â· '}
-                Profit phase:{' '}
-                {Number(p.profitDurationDays??45)} days
-                {' Ã‚Â· '}
-                Total:{' '}
-                {Number(p.investmentDays??90)} days
-              </div>
-
-              <div>
-                Profit:{' '}
-                <strong>
-                  {Number(p.profitPercent??0)}%
-                </strong>
-              </div>
-
-              <div>
-                Expected payout:{' '}
-                <strong>
-                  ${(Number(p.salePrice??p.price)*
-                    (1+Number(p.profitPercent??0)/100)
-                  ).toFixed(2)}
-                </strong>
-              </div>
+              
 
               {p.endDate&&
                 <Countdown end={p.endDate}/>
