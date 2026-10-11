@@ -1128,32 +1128,7 @@ function Packages(){
                 </strong>
               </div>
 
-              <div className="muted">
-                Capital recovery:{' '}
-                {Number(p.capitalRecoveryDays??45)} days
-                {' Ã‚Â· '}
-                Profit phase:{' '}
-                {Number(p.profitDurationDays??45)} days
-                {' Ã‚Â· '}
-                Total:{' '}
-                {Number(p.investmentDays??90)} days
-              </div>
-
-              <div>
-                Profit:{' '}
-                <strong>
-                  {Number(p.profitPercent??0)}%
-                </strong>
-              </div>
-
-              <div>
-                Expected payout:{' '}
-                <strong>
-                  ${(Number(p.salePrice??p.price)*
-                    (1+Number(p.profitPercent??0)/100)
-                  ).toFixed(2)}
-                </strong>
-              </div>
+              
 
               {p.endDate&&
                 <Countdown end={p.endDate}/>
