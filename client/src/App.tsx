@@ -1,4 +1,4 @@
-﻿import {useEffect,useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {ReactNode,FormEvent} from 'react';
 import {Link,Routes,Route,useNavigate,useParams, NavLink} from 'react-router-dom';
 import {api,setAccessToken,getAccessToken} from './lib/api';
@@ -44,7 +44,7 @@ function Shell({children,title='NFT FUSION'}:{children:ReactNode;title?:string})
 
   return <div className="shell">
     {impersonation&&<div className="notice" style={{margin:0,borderRadius:0,display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
-      <span><strong>IMPERSONATING:</strong> {member?.username??'Member'} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â admin actions are disabled in this session.</span>
+      <span><strong>IMPERSONATING:</strong> {member?.username??'Member'} — admin actions are disabled in this session.</span>
       <button onClick={returnToAdmin}>Return to Admin</button>
     </div>}
     <header>
